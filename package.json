@@ -1,0 +1,168 @@
+{
+	"name": "testdriver",
+	"publisher": "vscode-samples",
+	"displayName": "TestDriver VS Code Extension",
+	"description": "AI QA Agents",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Microsoft/vscode-extension-samples"
+	},
+	"version": "0.1.0",
+	"engines": {
+		"vscode": "^1.95.0"
+	},
+	"categories": [
+		"AI",
+		"Chat"
+	],
+	"activationEvents": ["*"],
+	"contributes": {
+		"chatParticipants": [
+			{
+				"id": "testdriver.driver",
+				"fullName": "TestDriver",
+				"name": "testdriver",
+				"description": "What can I test for you?",
+				"isSticky": true,
+				"commands": [
+					{
+						"name": "dry",
+						"description": "Generate TestDriver steps using a desktop screenshot",
+						"disambiguation": [
+							{
+								"category": "cat_play",
+								"description": "The user just wants to relax and see the cat play.",
+								"examples": [
+									"Enough learning, let the cat play with a ball of yarn",
+									"Can you show me a cat playing with a laser pointer?"
+								]
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "chat-tools-sample.tools",
+				"fullName": "Tool User",
+				"name": "tools",
+				"description": "I use tools",
+				"isSticky": true,
+				"commands": [
+					{
+						"name": "list",
+						"description": "List all available tools"
+					},
+					{
+						"name": "all",
+						"description": "Use all registered tools. By default, only this extension's tools are used."
+					}
+				]
+			},
+			{
+				"id": "chat-tools-sample.catTools",
+				"fullName": "Cat (Tools)",
+				"name": "catTools",
+				"description": "I use tools, implemented using @vscode/chat-extension-utils, and am also a cat",
+				"isSticky": true,
+				"commands": [
+					{
+						"name": "all",
+						"description": "Use all registered tools. By default, only this extension's tools are used."
+					}
+				]
+			}
+		],
+		"languageModelTools": [
+			{
+				"name": "chat-tools-sample_tabCount",
+				"tags": [
+					"editors",
+					"chat-tools-sample"
+				],
+				"toolReferenceName": "tabCount",
+				"displayName": "Tab Count",
+				"modelDescription": "The number of active tabs in a tab group",
+				"icon": "$(files)",
+				"inputSchema": {
+					"type": "object",
+					"properties": {
+						"tabGroup": {
+							"type": "number",
+							"description": "The index of the tab group to check. This is optional- if not specified, the active tab group will be checked.",
+							"default": 0
+						}
+					}
+				}
+			},
+			{
+				"name": "chat-tools-sample_findFiles",
+				"tags": [
+					"files",
+					"search",
+					"chat-tools-sample"
+				],
+				"displayName": "Find Files",
+				"modelDescription": "Search for files in the current workspace",
+				"inputSchema": {
+					"type": "object",
+					"properties": {
+						"pattern": {
+							"type": "string",
+							"description": "Search for files that match this glob pattern"
+						}
+					},
+					"required": [
+						"pattern"
+					]
+				}
+			},
+			{
+				"name": "chat-tools-sample_runInTerminal",
+				"tags": [
+					"terminal",
+					"chat-tools-sample"
+				],
+				"displayName": "Run in Terminal",
+				"modelDescription": "Run a command in a terminal and return the output",
+				"inputSchema": {
+					"type": "object",
+					"properties": {
+						"command": {
+							"type": "string",
+							"description": "The command to run"
+						}
+					},
+					"required": [
+						"command"
+					]
+				}
+			}
+		],
+		"commands": [
+			{
+				"command": "dry",
+				"title": "Create Test Steps from Screenshot"
+			}
+		]
+	},
+	"main": "./out/extension.js",
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"compile": "tsc -p ./",
+		"lint": "eslint",
+		"watch": "tsc -watch -p ./"
+	},
+	"dependencies": {
+		"@vscode/chat-extension-utils": "^0.0.0-alpha.1",
+		"@vscode/prompt-tsx": "^0.3.0-alpha.12"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.13.0",
+		"@stylistic/eslint-plugin": "^2.9.0",
+		"@types/node": "^20",
+		"@types/vscode": "^1.95.0",
+		"eslint": "^9.13.0",
+		"typescript": "^5.8.2",
+		"typescript-eslint": "^8.26.0"
+	}
+}
