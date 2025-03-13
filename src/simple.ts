@@ -5,8 +5,7 @@ import path from 'path';
 const spawn = require('child_process').spawn;
 const WebSocket = require('ws'); // Add WebSocket import
 
-const CAT_NAMES_COMMAND_ID = 'cat.namesInEditor';
-const CAT_PARTICIPANT_ID = 'testdriver.driver';
+const PARTICIPANT_ID = 'testdriver.driver';
 
 let tempFile = path.join(homedir(), `tmp/testdriver-${new Date().getTime()}.yml`);
 
@@ -15,7 +14,16 @@ const terminal = vscode.window.createTerminal("TestDriver");
 terminal.show();
 terminal.sendText(`/Users/ianjennings/Development/testdriverai/index.js ${tempFile}`);
 
-let callTDCLI = function (command, stream) {
+interface WebSocketMessage {
+  event: string;
+  message?: string;
+}
+
+interface CallTDCLIResult {
+  yml: string;
+}
+
+const callTDCLI = function (command: string, stream: vscode.ChatResponseStream): Promise<CallTDCLIResult> {
 
   const ws = new WebSocket('ws://localhost:8080');
 
@@ -33,9 +41,9 @@ let callTDCLI = function (command, stream) {
       console.log('WebSocket connection closed');
     });
 
-    ws.on('error', (error) => {
+    ws.on('error', (error: Error) => {
       console.error(`WebSocket error: ${error}`);
-      console.log(error)
+      console.log(error);
       reject(error);
     });
 
@@ -45,11 +53,11 @@ let callTDCLI = function (command, stream) {
     let YMLever = false;
     let hasBlock = false;
 
-    ws.on('message', (data) => {
+    ws.on('message', (data: string) => {
 
-      let parsedData = JSON.parse(data);
+      let parsedData: WebSocketMessage = JSON.parse(data);
 
-      if (parsedData.event === 'output') {
+      if (parsedData.event === 'output' && parsedData.message) {
 
         let nextmsg = parsedData.message;
 
@@ -58,14 +66,14 @@ let callTDCLI = function (command, stream) {
           buff += char;
           if (buff.slice(-3) === '```') {
 
-            console.log('yml detected')
+            console.log('yml detected');
 
             insideYML = !insideYML;
 
             if (insideYML) {
-              console.log('pushign')
+              console.log('pushing');
               nextmsg = nextmsg + '';
-              console.log(nextmsg)
+              console.log(nextmsg);
               YMLever = true;
             }
 
@@ -73,10 +81,10 @@ let callTDCLI = function (command, stream) {
 
         }
 
-        console.log(buff)
-        console.log('--------')
-        console.log(nextmsg)
-        console.log('-------------------')
+        console.log(buff);
+        console.log('--------');
+        console.log(nextmsg);
+        console.log('-------------------');
         stream.markdown(nextmsg);
 
         if (!insideYML && YMLever && !hasBlock) {
@@ -94,14 +102,17 @@ let callTDCLI = function (command, stream) {
 
       }
 
-
       if (parsedData.event === 'done') {
 
         resolve({
           yml: thisYML,
-        });
+	    });
 
-      }
+      ws.on('close', () => {
+        console.log('WebSocket connection closed');
+        reject(new Error('WebSocket connection closed before receiving done event'));
+      });
+	}
 
     });
 
@@ -110,7 +121,7 @@ let callTDCLI = function (command, stream) {
 
 vscode.commands.registerCommand('testdriver.codeblock.run', async () => {
   vscode.window.showInformationMessage(`Running YML steps:`);
-  await callTDCLI(`/run ${tempFile}`);
+  await callTDCLI(`/run ${tempFile}`, {} as vscode.ChatResponseStream);
 });
 
 interface ICatChatResult extends vscode.ChatResult {
@@ -118,26 +129,26 @@ interface ICatChatResult extends vscode.ChatResult {
         command: string;
     }
 }
-const ansiRegex = (({ onlyFirst = false } = {}) => {
-  const pattern = [
-    "[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)",
-    "(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))",
-  ].join("|");
-  return new RegExp(pattern, onlyFirst ? undefined : "g");
-})();
+// const ansiRegex = (({ onlyFirst = false } = {}) => {
+//   const pattern = [
+//     "[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)",
+//     "(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))",
+//   ].join("|");
+//   return new RegExp(pattern, onlyFirst ? undefined : "g");
+// })();
 
-function stripAnsi(string) {
-  if (typeof string !== "string") {
-    throw new TypeError(`Expected a \`string\`, got \`${typeof string}\``);
-  }
+// function stripAnsi(string) {
+//   if (typeof string !== "string") {
+//     throw new TypeError(`Expected a \`string\`, got \`${typeof string}\``);
+//   }
 
-  return string.replace(ansiRegex, "");
-}
+//   return string.replace(ansiRegex, "");
+// }
 
 export function registerSimpleParticipant(context: vscode.ExtensionContext) {
 
     // Define a Cat chat handler.
-    const handler: vscode.ChatRequestHandler = async (request: vscode.ChatRequest, context: vscode.ChatContext, stream: vscode.ChatResponseStream, token: vscode.CancellationToken): Promise<ICatChatResult> => {
+	const handler: vscode.ChatRequestHandler = async (request: vscode.ChatRequest, context: vscode.ChatContext, stream: vscode.ChatResponseStream, token: vscode.CancellationToken): Promise<void> => {
 
       // generate a temporary file
 
@@ -150,11 +161,10 @@ export function registerSimpleParticipant(context: vscode.ExtensionContext) {
       } else {
 
         stream.progress('Staring my engine...');
-        const topic = getTopic(context.history);
+
         try {
             const messages = [
                 vscode.LanguageModelChatMessage.User('You are TestDriver.ai, the best quality assurance engineer in the world. Your job is help the user write tests. You have the special ability to understand whats on the users computer screen and help them write tests for it. All of your tests are in a special YML format. YML has commands and steps. Every new step that is copied from the chat should almost alwasys be appended to the end of the file.'),
-                vscode.LanguageModelChatMessage.User(topic),
                 vscode.LanguageModelChatMessage.User(request.prompt)
             ];
 
@@ -174,7 +184,7 @@ export function registerSimpleParticipant(context: vscode.ExtensionContext) {
     // Chat participants appear as top-level options in the chat input
     // when you type `@`, and can contribute sub-commands in the chat input
     // that appear when you type `/`.
-    const cat = vscode.chat.createChatParticipant(CAT_PARTICIPANT_ID, handler);
+    const cat = vscode.chat.createChatParticipant(PARTICIPANT_ID, handler);
     cat.iconPath = vscode.Uri.joinPath(context.extensionUri, 'icon.png');
     cat.followupProvider = {
         provideFollowups(_result: ICatChatResult, _context: vscode.ChatContext, _token: vscode.CancellationToken) {
@@ -195,7 +205,7 @@ export function registerSimpleParticipant(context: vscode.ExtensionContext) {
         sendErrorData(error, data) {
             // Capture error telemetry
             console.error(`Error: ${error}`);
-            console.error(`Data: ${JSON.stringify(data}`);
+            console.error(`Data: ${JSON.stringify(data)}`);
         }
     });
 
