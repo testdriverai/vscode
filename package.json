@@ -15,7 +15,9 @@
 		"AI",
 		"Chat"
 	],
-	"activationEvents": ["*"],
+	"activationEvents": [
+		"*"
+	],
 	"contributes": {
 		"chatParticipants": [
 			{
@@ -30,11 +32,25 @@
 						"description": "Generate TestDriver steps using a desktop screenshot",
 						"disambiguation": [
 							{
-								"category": "cat_play",
-								"description": "The user just wants to relax and see the cat play.",
+								"category": "exec",
+								"description": "The user wants to try steps before executing them.",
 								"examples": [
-									"Enough learning, let the cat play with a ball of yarn",
-									"Can you show me a cat playing with a laser pointer?"
+									"open browser and navigate to airbnb.com",
+									"fill out this form"
+								]
+							}
+						]
+					},
+					{
+						"name": "try",
+						"description": "Generate TestDriver steps using a desktop screenshot",
+						"disambiguation": [
+							{
+								"category": "exec",
+								"description": "The user wants to automate a workflow in one step",
+								"examples": [
+									"open browser and navigate to airbnb.com",
+									"fill out this form"
 								]
 							}
 						]
@@ -141,7 +157,11 @@
 		"commands": [
 			{
 				"command": "dry",
-				"title": "Create Test Steps from Screenshot"
+				"title": "Analyze screen and generate test steps, but don't run them."
+			},
+			{
+				"command": "try",
+				"title": "Analyze screen and generate test steps, then run."
 			}
 		]
 	},
@@ -154,13 +174,17 @@
 	},
 	"dependencies": {
 		"@vscode/chat-extension-utils": "^0.0.0-alpha.1",
-		"@vscode/prompt-tsx": "^0.3.0-alpha.12"
+		"@vscode/prompt-tsx": "^0.3.0-alpha.12",
+		"markdown-parser": "^0.0.8",
+		"vscode": "^1.1.37",
+		"ws": "^8.18.1"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.13.0",
 		"@stylistic/eslint-plugin": "^2.9.0",
 		"@types/node": "^20",
 		"@types/vscode": "^1.95.0",
+		"@types/ws": "^8.18.0",
 		"eslint": "^9.13.0",
 		"typescript": "^5.8.2",
 		"typescript-eslint": "^8.26.0"

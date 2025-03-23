@@ -35,19 +35,59 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	const runHandler = (request: vscode.TestRunRequest, cancellation: vscode.CancellationToken) => {
-		if (!request.continuous) {
-			return startTestRun(request);
-		}
+  async function runHandler(
+    shouldDebug: boolean,
+    request: vscode.TestRunRequest,
+    token: vscode.CancellationToken
+  ) {
+    const run = controller.createTestRun(request);
+    const queue: vscode.TestItem[] = [];
 
-		if (request.include === undefined) {
-			watchingTests.set('ALL', request.profile);
-			cancellation.onCancellationRequested(() => watchingTests.delete('ALL'));
-		} else {
-			request.include.forEach(item => watchingTests.set(item, request.profile));
-			cancellation.onCancellationRequested(() => request.include!.forEach(item => watchingTests.delete(item)));
-		}
-	};
+    // Loop through all included tests, or all known tests, and add them to our queue
+    if (request.include) {
+      request.include.forEach(test => queue.push(test));
+    } else {
+      controller.items.forEach(test => queue.push(test));
+    }
+
+    // For every test that was queued, try to run it. Call run.passed() or run.failed().
+    // The `TestMessage` can contain extra information, like a failing location or
+    // a diff output. But here we'll just give it a textual message.
+    while (queue.length > 0 && !token.isCancellationRequested) {
+      const test = queue.pop()!;
+
+      // Skip tests the user asked to exclude
+      if (request.exclude?.includes(test)) {
+        continue;
+      }
+
+      switch (getType(test)) {
+        case ItemType.File:
+          // If we're running a file and don't know what it contains yet, parse it now
+          if (test.children.size === 0) {
+            await parseTestsInFileContents(test);
+          }
+          break;
+        case ItemType.TestCase:
+          // Otherwise, just run the test case. Note that we don't need to manually
+          // set the state of parent tests; they'll be set automatically.
+          const start = Date.now();
+          try {
+            await assertTestPasses(test);
+            run.passed(test, Date.now() - start);
+          } catch (e) {
+            run.failed(test, new vscode.TestMessage(e.message), Date.now() - start);
+          }
+          break;
+      }
+
+      test.children.forEach(test => queue.push(test));
+    }
+
+    // Make sure to end the run after all tests have been executed:
+    run.end();
+  }
+
 
 	const startTestRun = (request: vscode.TestRunRequest) => {
 		const queue: { test: vscode.TestItem; data: TestCase }[] = [];
@@ -91,8 +131,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
 		const runTestQueue = async () => {
 			for (const { test, data } of queue) {
+
 				run.appendOutput(`Running ${test.id}\r\n`);
-				if (run.token.isCancellationRequested) {
+
+        if (run.token.isCancellationRequested) {
 					run.skipped(test);
 				} else {
 					run.started(test);
@@ -102,7 +144,8 @@ export async function activate(context: vscode.ExtensionContext) {
 				const lineNo = test.range!.start.line;
 				const fileCoverage = coveredLines.get(test.uri!.toString());
 				const lineInfo = fileCoverage?.[lineNo];
-				if (lineInfo) {
+
+        if (lineInfo) {
 					(lineInfo.executed as number)++;
 				}
 
@@ -151,7 +194,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
-		if (!e.uri.path.endsWith('.md')) {
+		if (!e.uri.path.endsWith('.yaml')) {
 			return;
 		}
 
@@ -198,7 +241,7 @@ function getWorkspaceTestPatterns() {
 
 	return vscode.workspace.workspaceFolders.map(workspaceFolder => ({
 		workspaceFolder,
-		pattern: new vscode.RelativePattern(workspaceFolder, '**/*.md'),
+		pattern: new vscode.RelativePattern(workspaceFolder, 'testdriver/**/*.yaml'),
 	}));
 }
 

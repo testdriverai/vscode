@@ -1,127 +1,11 @@
-import { renderPrompt } from '@vscode/prompt-tsx';
 import * as vscode from 'vscode';
-import { homedir } from 'os';
-import path from 'path';
-const spawn = require('child_process').spawn;
-const WebSocket = require('ws'); // Add WebSocket import
-
+import cli from './cli';
 const PARTICIPANT_ID = 'testdriver.driver';
+import spec from './spec';
 
-let tempFile = path.join(homedir(), `tmp/testdriver-${new Date().getTime()}.yml`);
-
-// Connect to WebSocket server
-const terminal = vscode.window.createTerminal("TestDriver");
-terminal.show();
-terminal.sendText(`/Users/ianjennings/Development/testdriverai/index.js ${tempFile}`);
-
-interface WebSocketMessage {
-  event: string;
-  message?: string;
-}
-
-interface CallTDCLIResult {
-  yml: string;
-}
-
-const callTDCLI = function (command: string, stream: vscode.ChatResponseStream): Promise<CallTDCLIResult> {
-
-  const ws = new WebSocket('ws://localhost:8080');
-
-  return new Promise((resolve, reject) => {
-
-    ws.on('open', () => {
-      console.log('WebSocket connection opened');
-      ws.send(JSON.stringify({
-        event: "input",
-        data: command
-      }));
-    });
-
-    ws.on('close', () => {
-      console.log('WebSocket connection closed');
-    });
-
-    ws.on('error', (error: Error) => {
-      console.error(`WebSocket error: ${error}`);
-      console.log(error);
-      reject(error);
-    });
-
-    let buff = '';
-    let thisYML = '';
-    let insideYML = false;
-    let YMLever = false;
-    let hasBlock = false;
-
-    ws.on('message', (data: string) => {
-
-      let parsedData: WebSocketMessage = JSON.parse(data);
-
-      if (parsedData.event === 'output' && parsedData.message) {
-
-        let nextmsg = parsedData.message;
-
-        for (const char of parsedData.message) {
-
-          buff += char;
-          if (buff.slice(-3) === '```') {
-
-            console.log('yml detected');
-
-            insideYML = !insideYML;
-
-            if (insideYML) {
-              console.log('pushing');
-              nextmsg = nextmsg + '';
-              console.log(nextmsg);
-              YMLever = true;
-            }
-
-          }
-
-        }
-
-        console.log(buff);
-        console.log('--------');
-        console.log(nextmsg);
-        console.log('-------------------');
-        stream.markdown(nextmsg);
-
-        if (!insideYML && YMLever && !hasBlock) {
-
-          // Render a button to trigger a VS Code command
-          stream.button({
-            command: 'testdriver.codeblock.run',
-            title: vscode.l10n.t('Run Steps'),
-            arguments: [] // Send the YML code as an argument
-          });
-
-          hasBlock = true;
-
-        }
-
-      }
-
-      if (parsedData.event === 'done') {
-
-        resolve({
-          yml: thisYML,
-	    });
-
-      ws.on('close', () => {
-        console.log('WebSocket connection closed');
-        reject(new Error('WebSocket connection closed before receiving done event'));
-      });
-	}
-
-    });
-
-  });
-}
-
-vscode.commands.registerCommand('testdriver.codeblock.run', async () => {
+vscode.commands.registerCommand('testdriver.codeblock.run', async (yaml) => {
   vscode.window.showInformationMessage(`Running YML steps:`);
-  await callTDCLI(`/run ${tempFile}`, {} as vscode.ChatResponseStream);
+  await cli.exec(`/yaml ${yaml}`);
 });
 
 interface ICatChatResult extends vscode.ChatResult {
@@ -154,21 +38,47 @@ export function registerSimpleParticipant(context: vscode.ExtensionContext) {
 
       if (request.command === 'dry') {
 
-        stream.progress('Generating...');
-        await callTDCLI('/dry ' + request.prompt, stream);
-        await callTDCLI('/save ' + tempFile, stream);
+        stream.progress('Looking at screen...');
+        await cli.exec('/dry ' + request.prompt, stream);
+
+      } else if (request.command === 'try') {
+
+        stream.progress('Looking at screen...');
+        await cli.exec(request.prompt, stream);
 
       } else {
 
         stream.progress('Staring my engine...');
 
+        console.log(context.history)
+
+
+
         try {
             const messages = [
-                vscode.LanguageModelChatMessage.User('You are TestDriver.ai, the best quality assurance engineer in the world. Your job is help the user write tests. You have the special ability to understand whats on the users computer screen and help them write tests for it. All of your tests are in a special YML format. YML has commands and steps. Every new step that is copied from the chat should almost alwasys be appended to the end of the file.'),
-                vscode.LanguageModelChatMessage.User(request.prompt)
-            ];
+                vscode.LanguageModelChatMessage.User(spec),            ];
 
+            // get all the previous participant messages
+            const previousMessages = context.history.filter(
+              h => h instanceof vscode.ChatResponseTurn
+            );
+
+            // add the previous messages to the messages array
+            previousMessages.forEach(m => {
+              let fullMessage = '';
+              m.response.forEach(r => {
+                const mdPart = r as vscode.ChatResponseMarkdownPart;
+                fullMessage += mdPart.value.value;
+              });
+              messages.push(vscode.LanguageModelChatMessage.Assistant(fullMessage));
+            });
+
+            // add in the user's message
+            messages.push(vscode.LanguageModelChatMessage.User(request.prompt));
+
+            // send the request
             const chatResponse = await request.model.sendRequest(messages, {}, token);
+
             for await (const fragment of chatResponse.text) {
                 stream.markdown(fragment);
             }
@@ -184,9 +94,9 @@ export function registerSimpleParticipant(context: vscode.ExtensionContext) {
     // Chat participants appear as top-level options in the chat input
     // when you type `@`, and can contribute sub-commands in the chat input
     // that appear when you type `/`.
-    const cat = vscode.chat.createChatParticipant(PARTICIPANT_ID, handler);
-    cat.iconPath = vscode.Uri.joinPath(context.extensionUri, 'icon.png');
-    cat.followupProvider = {
+    const td = vscode.chat.createChatParticipant(PARTICIPANT_ID, handler);
+    td.iconPath = vscode.Uri.joinPath(context.extensionUri, 'icon.png');
+    td.followupProvider = {
         provideFollowups(_result: ICatChatResult, _context: vscode.ChatContext, _token: vscode.CancellationToken) {
             return [{
                 prompt: 'let us play',
@@ -209,7 +119,7 @@ export function registerSimpleParticipant(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(cat.onDidReceiveFeedback((feedback: vscode.ChatResultFeedback) => {
+    context.subscriptions.push(td.onDidReceiveFeedback((feedback: vscode.ChatResultFeedback) => {
         // Log chat result feedback to be able to compute the success matric of the participant
         // unhelpful / totalRequests is a good success metric
         logger.logUsage('chatResultFeedback', {

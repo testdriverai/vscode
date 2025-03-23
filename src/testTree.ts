@@ -1,6 +1,7 @@
 import { TextDecoder } from 'util';
 import * as vscode from 'vscode';
 import { parseMarkdown } from './parser';
+import cli from './cli';
 
 const textDecoder = new TextDecoder('utf-8');
 
@@ -49,32 +50,6 @@ export class TestFile {
 			}
 		};
 
-		parseMarkdown(content, {
-			onTest: (range, a, operator, b, expected) => {
-				const parent = ancestors[ancestors.length - 1];
-				const data = new TestCase(a, operator as Operator, b, expected, thisGeneration);
-				const id = `${item.uri}/${data.getLabel()}`;
-
-
-				const tcase = controller.createTestItem(id, data.getLabel(), item.uri);
-				testData.set(tcase, data);
-				tcase.range = range;
-				parent.children.push(tcase);
-			},
-
-			onHeading: (range, name, depth) => {
-				ascend(depth);
-				const parent = ancestors[ancestors.length - 1];
-				const id = `${item.uri}/${name}`;
-
-				const thead = controller.createTestItem(id, name, item.uri);
-				thead.range = range;
-				testData.set(thead, new TestHeading(thisGeneration));
-				parent.children.push(thead);
-				ancestors.push({ item: thead, children: [] });
-			},
-		});
-
 		ascend(0); // finish and assign children for all remaining items
 	}
 }
@@ -100,8 +75,14 @@ export class TestCase {
 
 	async run(item: vscode.TestItem, options: vscode.TestRun): Promise<void> {
 		const start = Date.now();
-		await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
-		const actual = this.evaluate();
+
+    console.log(item)
+
+    let run = await cli.exec(`/run ${item.uri}`);
+
+    console.log(run)
+
+    const actual = this.evaluate();
 		const duration = Date.now() - start;
 
 		if (actual === this.expected) {
