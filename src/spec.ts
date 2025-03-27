@@ -154,4 +154,4 @@ outputs:
 runs:
   using: node16
   main: ./dist/index.js
-`
+`;

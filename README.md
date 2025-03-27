@@ -16,6 +16,7 @@ This GitHub Copilot Extension sample shows:
 ![demo](./demo.png)
 
 Documentation can be found here:
+
 - https://code.visualstudio.com/api/extension-guides/cha
 - https://code.visualstudio.com/api/extension-guides/language-model
 
@@ -23,9 +24,9 @@ Documentation can be found here:
 
 - Run `npm install` in terminal to install dependencies
 - Run the `Run Extension` target in the Debug View. This will:
-	- Start a task `npm: watch` to compile the code
-	- Run the extension in a new VS Code window
-	- You will see the @cat chat participant show in the GitHub Copilot Chat view
+  - Start a task `npm: watch` to compile the code
+  - Run the extension in a new VS Code window
+  - You will see the @cat chat participant show in the GitHub Copilot Chat view
 
 ## About this sample
 
@@ -34,4 +35,5 @@ This sample shows two different ways to build a chat participant in VS Code:
 See [simple.ts](src/simple.ts) for an example of a simple chat participant that makes requests and responds to user queries. It shows how you can create chat participants with or without the [@vscode/prompt-tsx](https://www.npmjs.com/package/@vscode/prompt-tsx) library.
 
 See [toolParticipant.ts](src/toolParticipant.ts) for an example of a chat participant that invokes tools, either dynamically or using the `toolReferences` that are attached to the request. This is a more advanced example that shows how you can use the [@vscode/prompt-tsx](https://www.npmjs.com/package/@vscode/prompt-tsx) library to implement the LLM tool calling flow and tries to implement all the features of the chat API.
+
 # vscode
