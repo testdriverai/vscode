@@ -156,6 +156,10 @@
     ],
     "commands": [
       {
+        "command": "testdriver.init",
+        "title": "Initialize testdriver in the active workspace"
+      },
+      {
         "command": "dry",
         "title": "Analyze screen and generate test steps, but don't run them."
       },
