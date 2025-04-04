@@ -9,6 +9,7 @@ type IPCType = InferType<typeof nodeIPC.IPC>;
 const { IPC } = nodeIPC;
 
 interface EventsMap {
+  vm_url: [string];
   stdout: [string];
   stderr: [string];
   exit: [number | null];
@@ -105,6 +106,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
             break;
           case 'output':
             this.emit('output', data as string);
+            break;
+          case 'show:vm':
+            this.emit('vm_url', data as string);
+            break;
         }
       };
 
