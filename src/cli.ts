@@ -128,8 +128,8 @@ export class TDInstance extends EventEmitter<EventsMap> {
       .on('idle', () => console.log('[debug:idle]'))
       .on('busy', () => console.log('[debug:busy]'))
       .on('exit', (code) => console.log('[debug:exit]', code))
-      // .on('stdout', (data) => process.stdout.write(data))
-      // .on('stderr', (data) => process.stderr.write(data))
+      .on('stdout', (data) => process.stdout.write(data))
+      .on('stderr', (data) => process.stderr.write(data))
       .on('output', (data) => process.stdout.write(data));
   }
 
