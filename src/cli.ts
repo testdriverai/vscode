@@ -172,7 +172,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
         };
 
         this.once('exit', (code) =>
-          code === 0 ? resolve(result) : reject(new Error('Process exited')),
+          code ? reject(new Error('Process exited')) : resolve(result),
         );
         const parser = new MarkdownStreamParser();
 

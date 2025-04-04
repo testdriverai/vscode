@@ -125,6 +125,9 @@ const setupRunProfiles = (controller: vscode.TestController) => {
         token.onCancellationRequested(() => abortController.abort());
 
         const instance = new TDInstance(workspaceFolder);
+        instance.on('output', (data) => {
+          run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'));
+        });
         await instance
           .run(`/run ${relativePath}`, { signal: abortController.signal })
           .then(() => run.passed(test))
