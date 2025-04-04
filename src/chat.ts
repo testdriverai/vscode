@@ -6,7 +6,8 @@ import spec from './spec';
 export const PARTICIPANT_ID = 'testdriver.driver';
 
 export function registerChatParticipant(_context: vscode.ExtensionContext) {
-  vscode.chat.createChatParticipant(PARTICIPANT_ID, handler);
+  let participant = vscode.chat.createChatParticipant(PARTICIPANT_ID, handler);
+  participant.iconPath = vscode.Uri.joinPath(_context.extensionUri, 'icon.png');
 }
 
 const handler: vscode.ChatRequestHandler = async (
