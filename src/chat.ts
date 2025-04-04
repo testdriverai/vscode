@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { TDInstance } from './cli';
 import { getActiveWorkspaceFolder } from './utils';
+import spec from './spec';
 
 export const PARTICIPANT_ID = 'testdriver.driver';
 
@@ -54,5 +55,45 @@ const handler: vscode.ChatRequestHandler = async (
       stream.progress('Unsupported command: ' + request.command);
     }
     return;
+  } else {
+
+    stream.progress('Staring my engine...');
+
+    console.log(_context.history)
+
+
+
+    try {
+        const messages = [
+            vscode.LanguageModelChatMessage.User(spec),            ];
+
+        // get all the previous participant messages
+        const previousMessages = _context.history.filter(
+          h => h instanceof vscode.ChatResponseTurn
+        );
+
+        // add the previous messages to the messages array
+        previousMessages.forEach(m => {
+          let fullMessage = '';
+          m.response.forEach(r => {
+            const mdPart = r as vscode.ChatResponseMarkdownPart;
+            fullMessage += mdPart.value.value;
+          });
+          messages.push(vscode.LanguageModelChatMessage.Assistant(fullMessage));
+        });
+
+        // add in the user's message
+        messages.push(vscode.LanguageModelChatMessage.User(request.prompt));
+
+        // send the request
+        const chatResponse = await request.model.sendRequest(messages, {}, token);
+
+        for await (const fragment of chatResponse.text) {
+            stream.markdown(fragment);
+        }
+
+    } catch (err) {
+      console.log('err', err);
+    }
   }
 };
