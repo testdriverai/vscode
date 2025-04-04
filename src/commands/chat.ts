@@ -30,7 +30,7 @@ export const handleTDCommandInChat = async (
     ? 'workbench.action.chat.new'
     : 'workbench.action.chat.open';
 
-  await vscode.commands.executeCommand(`/${command}`, options);
+  await vscode.commands.executeCommand(`${command}`, options);
 };
 
 export const testdriverCommand = (command: 'dry' | 'try') => async () => {
