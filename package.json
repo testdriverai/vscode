@@ -1,6 +1,6 @@
 {
   "name": "testdriver",
-  "publisher": "vscode-samples",
+  "publisher": "testdriverai",
   "displayName": "TestDriver VS Code Extension",
   "description": "AI QA Agents",
   "repository": {
@@ -157,37 +157,39 @@
     "commands": [
       {
         "command": "testdriver.init",
-        "title": "Initialize testdriver in the active workspace"
+        "title": "TestDriver: Initialize testdriver in the active workspace"
       },
       {
-        "command": "dry",
-        "title": "Analyze screen and generate test steps, but don't run them."
+        "command": "testdriver.dry",
+        "title": "TestDriver: Analyze screen and generate test steps, but don't run them."
       },
       {
-        "command": "try",
-        "title": "Analyze screen and generate test steps, then run."
+        "command": "testdriver.try",
+        "title": "TestDriver: Analyze screen and generate test steps, then run them."
       }
     ]
   },
   "main": "./out/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc",
     "format": "prettier --write .",
     "lint": "eslint",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch"
   },
   "dependencies": {
     "@vscode/chat-extension-utils": "^0.0.0-alpha.1",
     "@vscode/prompt-tsx": "^0.3.0-alpha.12",
     "markdown-parser": "^0.0.8",
+    "node-ipc": "^12.0.0",
     "vscode": "^1.1.37",
     "ws": "^8.18.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@stylistic/eslint-plugin": "^2.9.0",
-    "@types/node": "^20",
+    "@types/node": "^20.17.30",
+    "@types/node-ipc": "^9.2.3",
     "@types/vscode": "^1.95.0",
     "@types/ws": "^8.18.0",
     "eslint": "^9.13.0",

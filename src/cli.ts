@@ -1,114 +1,230 @@
-import { homedir } from 'os';
-import path from 'path';
-import WebSocket from 'ws'; // Add WebSocket import
+import nodeIPC from 'node-ipc';
 import * as vscode from 'vscode';
+import EventEmitter from 'node:events';
+import { ChildProcess, spawn } from 'node:child_process';
+import { MarkdownStreamParser, MarkdownParserEvent } from './utils';
 
-interface CallTDCLIResult {
-  yml: string;
+type InferType<T> = T extends new () => infer U ? U : undefined;
+type IPCType = InferType<typeof nodeIPC.IPC>;
+const { IPC } = nodeIPC;
+
+interface EventsMap {
+  stdout: [string];
+  stderr: [string];
+  exit: [number | null];
+  output: [string];
+  pending: [];
+  idle: [];
+  busy: [];
 }
 
-const tempFile = `testdriver/testdriver-${new Date().getTime()}.yaml`;
+const MAX_RETRIES = 10;
+export class TDInstance extends EventEmitter<EventsMap> {
+  state: 'pending' | 'idle' | 'busy' | 'exit';
+  private client: IPCType;
+  private process: ChildProcess;
+  private serverId: string;
+  private cleanup?: () => void;
+  private isLocked = false;
 
-interface WebSocketMessage {
-  event: string;
-  message?: string;
-}
+  constructor(
+    public workspace: vscode.WorkspaceFolder,
+    public file?: string,
+  ) {
+    super();
+    this.state = 'pending';
 
-// Connect to WebSocket server
-const terminal = vscode.window.createTerminal('TestDriver');
-terminal.show();
-terminal.sendText(
-  `/Users/ianjennings/Development/testdriverai/index.js ${tempFile}`,
-);
+    this.client = new IPC();
+    this.client.config.id = `testdriverai_${this.workspace.name}_${process.pid}`;
+    this.client.config.retry = 50;
+    this.client.config.maxRetries = MAX_RETRIES;
+    this.client.config.silent = true;
 
-const callTDCLI = function (
-  command: string,
-  stream: vscode.ChatResponseStream,
-): Promise<CallTDCLIResult> {
-  const ws = new WebSocket('ws://localhost:8080');
+    const args: string[] = [];
+    if (file) {
+      args.push(file);
+    }
+    this.process = spawn(`testdriverai`, args, {
+      env: process.env,
+      cwd: workspace.uri.fsPath,
+      stdio: 'pipe',
+    });
 
-  return new Promise((resolve, reject) => {
-    ws.on('open', () => {
-      console.log('WebSocket connection opened');
-      ws.send(
-        JSON.stringify({
+    this.serverId = `testdriverai_${this.process.pid}`;
+
+    this.on('pending', () => (this.state = 'pending'))
+      .on('idle', () => (this.state = 'idle'))
+      .on('busy', () => (this.state = 'busy'))
+      .on('exit', () => {
+        this.state = 'exit';
+        this.destroy();
+      });
+
+    this.process.stdout!.on('data', (data) =>
+      this.emit('stdout', data.toString()),
+    );
+    this.process.stderr!.on('data', (data) =>
+      this.emit('stderr', data.toString()),
+    );
+
+    this.process.once('error', () => {
+      this.emit('exit', 1);
+    });
+
+    this.process.once('exit', (code) => {
+      this.emit('exit', code);
+    });
+
+    this.process.once('spawn', () => {
+      let retryCount = 0;
+      this.client.connectTo(this.serverId);
+
+      const onConnect = () => {
+        retryCount = 0;
+        this.emit('pending');
+      };
+      const onError = () => {
+        retryCount++;
+        if (this.state === 'pending' && retryCount <= MAX_RETRIES) {
+          return;
+        }
+        this.emit('exit', 1);
+      };
+
+      const onDisconnect = () => {
+        if (this.state !== 'pending') {
+          this.emit('exit', null);
+        }
+      };
+
+      const handleMessage = (message: { event: string; data: unknown }) => {
+        const { event, data } = message;
+        switch (event) {
+          case 'interactive':
+            this.emit((data as boolean) ? 'idle' : 'busy');
+            break;
+          case 'output':
+            this.emit('output', data as string);
+        }
+      };
+
+      this.client.of[this.serverId]
+        .on('connect', onConnect)
+        .on('error', onError)
+        .on('disconnect', onDisconnect)
+        .on('message', handleMessage);
+
+      this.cleanup = () => {
+        this.client.of[this.serverId]
+          ?.off('connect', onConnect)
+          ?.off('error', onError)
+          ?.off('disconnect', onDisconnect)
+          ?.off('message', handleMessage);
+      };
+    });
+
+    // Debug
+    this.on('pending', () => console.log('[debug:pending]'))
+      .on('idle', () => console.log('[debug:idle]'))
+      .on('busy', () => console.log('[debug:busy]'))
+      .on('exit', (code) => console.log('[debug:exit]', code))
+      // .on('stdout', (data) => process.stdout.write(data))
+      // .on('stderr', (data) => process.stderr.write(data))
+      .on('output', (data) => process.stdout.write(data));
+  }
+
+  async run(
+    command: string,
+    options: {
+      signal?: AbortSignal;
+      callback?: (event: MarkdownParserEvent) => void;
+    } = {},
+  ) {
+    if (this.isLocked) {
+      throw new Error('A command is already running');
+    }
+    this.isLocked = true;
+    const signal = options.signal ?? new AbortController().signal;
+
+    await new Promise((resolve, reject) => {
+      console.log('Waiting for cli to become available');
+      this.once('idle', () => {
+        console.log('cli is available');
+        resolve(true);
+      });
+      this.once('exit', () => reject(new Error('Process exited')));
+      signal.onabort = () => {
+        reject(new Error('Command aborted'));
+      };
+    }).catch((err) => {
+      this.isLocked = false;
+      throw err;
+    });
+
+    return new Promise<{ fullOutput: string; events: MarkdownParserEvent[] }>(
+      (resolve, reject) => {
+        signal.onabort = () => {
+          reject(new Error('Command aborted'));
+        };
+        const result: { fullOutput: string; events: MarkdownParserEvent[] } = {
+          fullOutput: '',
+          events: [],
+        };
+
+        this.once('exit', (code) =>
+          code === 0 ? resolve(result) : reject(new Error('Process exited')),
+        );
+        const parser = new MarkdownStreamParser();
+
+        const handleOutput = (message: string) => {
+          result.fullOutput += message;
+          for (const char of message) {
+            parser.processChar(char);
+          }
+        };
+
+        parser.on('markdown', (event) => {
+          result.events.push(event);
+          options.callback?.(event);
+        });
+
+        parser.on('codeblock', (event) => {
+          result.events.push(event);
+          options.callback?.(event);
+        });
+
+        this.once('busy', () => {
+          this.on('output', handleOutput);
+          this.once('idle', () => {
+            this.off('output', handleOutput);
+            parser.end();
+            resolve(result);
+          });
+        });
+
+        this.client.of[this.serverId].emit('message', {
           event: 'input',
           data: command,
-        }),
-      );
-    });
-
-    ws.on('close', () => {
-      console.log('WebSocket connection closed');
-    });
-
-    ws.on('error', (error: Error) => {
-      console.error(`WebSocket error: ${error}`);
-      console.log(error);
-      reject(error);
-    });
-
-    let buff = '';
-    let insideYML = false;
-    let YMLever = false;
-    let hasBlock = false;
-
-    ws.on('message', (data: string) => {
-      let parsedData: WebSocketMessage = JSON.parse(data);
-
-      if (parsedData.event === 'output' && parsedData.message) {
-        let nextmsg = parsedData.message;
-
-        for (const char of parsedData.message) {
-          buff += char;
-          if (buff.slice(-3) === '```') {
-            console.log('yml detected');
-
-            insideYML = !insideYML;
-
-            if (insideYML) {
-              console.log('pushing');
-              nextmsg = nextmsg + '';
-              console.log(nextmsg);
-              YMLever = true;
-            }
-          }
-        }
-
-        console.log(buff);
-        console.log('--------');
-        console.log(nextmsg);
-        console.log('-------------------');
-        stream.markdown(nextmsg);
-
-        if (!insideYML && YMLever) {
-          // Render a button to trigger a VS Code command
-          stream.button({
-            command: 'testdriver.codeblock.run',
-            title: vscode.l10n.t('Run Steps'),
-            arguments: [tempFile], // Send the YML code as an argument
-          });
-
-          YMLever = false; // Reset YMLever to handle multiple code blocks
-        }
-      }
-
-      if (parsedData.event === 'done') {
-        resolve({
-          yml: null,
         });
-      }
-
-      ws.on('close', () => {
-        console.log('WebSocket connection closed');
-        reject(
-          new Error('WebSocket connection closed before receiving done event'),
-        );
+      },
+    )
+      .then((result) => {
+        this.isLocked = false;
+        return result;
+      })
+      .catch((err) => {
+        this.isLocked = false;
+        this.emit('exit', 1);
+        throw err;
       });
-    });
-  });
-};
+  }
 
-export default {
-  exec: callTDCLI,
-};
+  destroy() {
+    this.process.stdout?.removeAllListeners();
+    this.process.stderr?.removeAllListeners();
+    this.cleanup?.();
+    this.client.disconnect(this.serverId);
+    this.process.kill(9);
+    this.state = 'exit';
+  }
+}
