@@ -2,15 +2,20 @@ import * as vscode from 'vscode';
 import { PARTICIPANT_ID } from '../chat';
 
 const getUserPrompt = async () => {
-  const userInput = await vscode.window.showInputBox({
-    value: '',
-    prompt: 'Prompt for TestDriver',
-    placeHolder: 'Your prompt ...',
-    validateInput: (text) => {
-      return text.trim().length > 0 ? null : 'Prompt cannot be empty';
-    },
-  });
-  return userInput?.trim();
+  let userInput: string | undefined;
+  while (!userInput?.trim().length) {
+    userInput = await vscode.window.showInputBox({
+      value: '',
+      prompt: 'Prompt for TestDriver',
+      placeHolder: 'Your prompt ...',
+      validateInput: (text) => {
+        if (!text?.trim().length) {
+          return 'Prompt cannot be empty';
+        }
+      },
+    });
+  }
+  return userInput.trim();
 };
 
 export const handleTDCommandInChat = async (
