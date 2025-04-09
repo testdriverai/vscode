@@ -145,27 +145,30 @@ export class TDInstance extends EventEmitter<EventsMap> {
       callback?: (event: MarkdownParserEvent) => void;
     } = {},
   ) {
-    if (this.isLocked) {
-      throw new Error('A command is already running');
-    }
-    this.isLocked = true;
     const signal = options.signal ?? new AbortController().signal;
-
-    await new Promise((resolve, reject) => {
-      console.log('Waiting for cli to become available');
-      this.once('idle', () => {
-        console.log('cli is available');
-        resolve(true);
+    do {
+      await new Promise((resolve, reject) => {
+        this.once('idle', () => {
+          console.log('cli is available');
+          resolve(true);
+        });
+        this.once('exit', () => reject(new Error('Process exited')));
+        signal.onabort = () => {
+          reject(new Error('Command aborted'));
+        };
+        switch (this.state) {
+          case 'idle':
+            return resolve(true);
+          case 'exit':
+            return reject(new Error('Process exited'));
+        }
+        console.log('Waiting for cli to become available');
+      }).catch((err) => {
+        throw err;
       });
-      this.once('exit', () => reject(new Error('Process exited')));
-      signal.onabort = () => {
-        reject(new Error('Command aborted'));
-      };
-    }).catch((err) => {
-      this.isLocked = false;
-      throw err;
-    });
+    } while (this.isLocked);
 
+    this.isLocked = true;
     return new Promise<{ fullOutput: string; events: MarkdownParserEvent[] }>(
       (resolve, reject) => {
         signal.onabort = () => {
