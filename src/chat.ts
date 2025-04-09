@@ -1,3 +1,4 @@
+import path from 'path';
 import * as vscode from 'vscode';
 import { getChatInstance } from './cli';
 import { getActiveWorkspaceFolder, MarkdownStreamParser } from './utils';
@@ -5,9 +6,12 @@ import spec from './spec';
 
 export const PARTICIPANT_ID = 'testdriver.driver';
 
-export function registerChatParticipant(_context: vscode.ExtensionContext) {
-  let participant = vscode.chat.createChatParticipant(PARTICIPANT_ID, handler);
-  participant.iconPath = vscode.Uri.joinPath(_context.extensionUri, 'icon.png');
+export function registerChatParticipant(context: vscode.ExtensionContext) {
+  const participant = vscode.chat.createChatParticipant(
+    PARTICIPANT_ID,
+    handler,
+  );
+  participant.iconPath = path.join(context.extensionUri.fsPath, 'icon.png');
 }
 
 const handler: vscode.ChatRequestHandler = async (
