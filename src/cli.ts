@@ -21,34 +21,68 @@ interface EventsMap {
 
 const MAX_RETRIES = 10;
 export class TDInstance extends EventEmitter<EventsMap> {
+  id: string;
+  public file?: string;
+  public env: Record<string, string> = {};
   state: 'pending' | 'idle' | 'busy' | 'exit';
   private client: IPCType;
   private process: ChildProcess;
   private serverId: string;
+  private overlayId?: string;
   private cleanup?: () => void;
   private isLocked = false;
 
   constructor(
-    public workspace: vscode.WorkspaceFolder,
-    public file?: string,
+    public cwd: string,
+    {
+      file,
+      env,
+    }: {
+      file?: string;
+      env?: Record<string, string>;
+    } = {},
   ) {
     super();
+    if (file) {
+      this.file = file;
+    }
+    if (env) {
+      this.env = env;
+    }
+    this.id = `testdriverai_vscode_${process.pid}`;
     this.state = 'pending';
 
+    this.overlayId = crypto.randomUUID();
     this.client = new IPC();
-    this.client.config.id = `testdriverai_${this.workspace.name}_${process.pid}`;
+    this.client.config.id = this.id;
     this.client.config.retry = 50;
     this.client.config.maxRetries = MAX_RETRIES;
     this.client.config.silent = true;
 
+    const terminal = vscode.window.createTerminal({
+      name: `TestDriver AI - vscode extension`,
+      cwd: this.cwd,
+      env: {
+        ...this.env,
+      },
+    });
+    terminal.sendText(
+      `testdriverai --renderer ${this.overlayId} && exit`,
+      true,
+    );
+
     const args: string[] = [];
-    if (file) {
-      args.push(file);
+    if (this.file) {
+      args.push(this.file);
     }
     this.process = spawn(`testdriverai`, args, {
-      env: process.env,
-      cwd: workspace.uri.fsPath,
       stdio: 'pipe',
+      cwd: this.cwd,
+      env: {
+        ...process.env,
+        ...this.env,
+        TD_OVERLAY_ID: this.overlayId,
+      },
     });
 
     this.serverId = `testdriverai_${this.process.pid}`;
