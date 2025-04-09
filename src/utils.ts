@@ -111,13 +111,6 @@ export class MarkdownStreamParser extends EventEmitter<{
       // If we get 3 backticks, we're either entering or exiting a code block
       if (this.backtickCount === 3) {
         if (this.inCodeBlock) {
-          // When we detect closing backticks, immediately remove backticks that might have been added to content
-          // For example if we have "content```" in the buffer, we need to trim the backticks
-          if (this.codeBlockContent.endsWith('``')) {
-            this.codeBlockContent = this.codeBlockContent.slice(0, -2);
-          } else if (this.codeBlockContent.endsWith('`')) {
-            this.codeBlockContent = this.codeBlockContent.slice(0, -1);
-          }
           this.potentialCodeBlockEnd = true;
         } else {
           this.potentialCodeBlockStart = true;
@@ -140,26 +133,18 @@ export class MarkdownStreamParser extends EventEmitter<{
       if (this.potentialCodeBlockStart) {
         if (this.languageCapture) {
           // If we're capturing a language and see whitespace, end language capture
-          if (/\s/.test(char)) {
+          if (char === '\n' || char === '\r') {
             this.languageCapture = false;
+            this.inCodeBlock = true;
+            this.potentialCodeBlockStart = false;
+            this.emit('markdown', this.markdownContent.trim());
+            this.markdownContent = '';
+            return;
           } else {
             // Otherwise add to language string
             this.codeBlockLang += char;
             return; // Skip adding to content
           }
-        }
-
-        // If we see a newline, confirm code block start
-        if (char === '\n') {
-          // Emit markdown content collected so far
-          if (this.markdownContent.trim()) {
-            this.emit('markdown', this.markdownContent);
-          }
-
-          this.markdownContent = '';
-          this.inCodeBlock = true;
-          this.potentialCodeBlockStart = false;
-          return; // Skip adding this newline to content
         }
       }
 
@@ -196,6 +181,11 @@ export class MarkdownStreamParser extends EventEmitter<{
         this.codeBlockContent += char;
       } else {
         this.markdownContent += char;
+        // Emit markdown content incrementally
+        if (this.markdownContent.trim()) {
+          this.emit('markdown', this.markdownContent);
+          this.markdownContent = '';
+        }
       }
     }
   }

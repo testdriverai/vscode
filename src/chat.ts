@@ -11,7 +11,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext) {
     PARTICIPANT_ID,
     handler,
   );
-  participant.iconPath = path.join(context.extensionUri.fsPath, 'icon.png');
+  participant.iconPath = vscode.Uri.file(path.join(context.extensionUri.fsPath, 'icon.png'));
 }
 
 const handler: vscode.ChatRequestHandler = async (
@@ -23,21 +23,29 @@ const handler: vscode.ChatRequestHandler = async (
   if (request.command) {
     const commands = ['dry', 'try'];
     if (commands.includes(request.command)) {
+
+      stream.progress('Thinking...');
+
       const workspace = getActiveWorkspaceFolder();
       if (!workspace) {
         stream.progress('No workspace found');
         return;
       }
-      stream.progress('Looking at screen...');
 
       const abortController = new AbortController();
       token.onCancellationRequested(() => abortController.abort());
 
       const instance = await getChatInstance();
 
+      instance.on('status', (status) => {
+        console.log('status', status);
+        stream.progress(status);
+      });
+
       await instance.run(`/${request.command} ${request.prompt}`, {
         signal: abortController.signal,
         callback: (event) => {
+          console.log('event', event);
           if (typeof event === 'string') {
             stream.markdown(event);
           } else {
@@ -54,13 +62,13 @@ const handler: vscode.ChatRequestHandler = async (
           }
         },
       });
-      instance.destroy();
+      // instance.destroy();
     } else {
       stream.progress('Unsupported command: ' + request.command);
     }
     return;
   } else {
-    stream.progress('Staring my engine...');
+    stream.progress('Thinking...');
     console.log(context.history);
 
     try {
@@ -90,9 +98,11 @@ const handler: vscode.ChatRequestHandler = async (
       const parser = new MarkdownStreamParser();
       parser
         .on('markdown', (event) => {
+          console.log('markdown', event);
           stream.markdown(event);
         })
         .on('codeblock', (event) => {
+          console.log('codeblock', event);
           stream.markdown(
             `\n\n\`\`\`${event.type ?? ''}\n${event.content}\n\`\`\`\n\n`,
           );

@@ -142,12 +142,16 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
       const handleMessage = (message: { event: string; data: unknown }) => {
         const { event, data } = message;
+        console.log('event', event, data);
         switch (event) {
           case 'interactive':
             this.emit((data as boolean) ? 'idle' : 'busy');
             break;
           case 'output':
             this.emit('output', data as string);
+            break;
+          case 'status':
+            this.emit('status', data as string);
             break;
           case 'show:vm':
             this.emit('vm_url', data as string);
@@ -176,8 +180,8 @@ export class TDInstance extends EventEmitter<EventsMap> {
       .on('busy', () => console.log('[debug:busy]'))
       .on('exit', (code) => console.log('[debug:exit]', code))
       .on('stdout', (data) => process.stdout.write(data))
-      .on('stderr', (data) => process.stderr.write(data));
-    // .on('output', (data) => process.stdout.write(data));
+      .on('stderr', (data) => process.stderr.write(data))
+      .on('output', (data) => process.stdout.write(data));
   }
 
   async run(
@@ -282,6 +286,9 @@ export class TDInstance extends EventEmitter<EventsMap> {
 let chatInstance: TDInstance | null = null;
 
 export const getChatInstance = async () => {
+
+  console.log('getChatInstance', chatInstance);
+
   if (!chatInstance || chatInstance.state === 'exit') {
     console.log('Creating new chat instance');
     const workingDir = getActiveWorkspaceFolder()?.uri.fsPath;
