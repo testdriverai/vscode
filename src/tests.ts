@@ -124,7 +124,7 @@ const setupRunProfiles = (controller: vscode.TestController) => {
         const abortController = new AbortController();
         token.onCancellationRequested(() => abortController.abort());
 
-        const instance = new TDInstance(workspaceFolder);
+        const instance = new TDInstance(workspaceFolder.uri.fsPath);
         instance.on('stdout', (data) => {
           run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
         });

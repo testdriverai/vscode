@@ -1,8 +1,16 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import dotenv from 'dotenv';
 import nodeIPC from 'node-ipc';
 import * as vscode from 'vscode';
 import EventEmitter from 'node:events';
 import { ChildProcess, spawn } from 'node:child_process';
-import { MarkdownStreamParser, MarkdownParserEvent } from './utils';
+import {
+  MarkdownParserEvent,
+  MarkdownStreamParser,
+  getActiveWorkspaceFolder,
+} from './utils';
 
 type InferType<T> = T extends new () => infer U ? U : undefined;
 type IPCType = InferType<typeof nodeIPC.IPC>;
@@ -270,3 +278,25 @@ export class TDInstance extends EventEmitter<EventsMap> {
     this.state = 'exit';
   }
 }
+
+let chatInstance: TDInstance | null = null;
+
+export const getChatInstance = async () => {
+  if (!chatInstance || chatInstance.state === 'exit') {
+    console.log('Creating new chat instance');
+    const workingDir = getActiveWorkspaceFolder()?.uri.fsPath;
+    let env: Record<string, string> = {};
+    if (workingDir) {
+      const envPath = path.join(workingDir, '.env');
+      if (fs.existsSync(envPath)) {
+        const file = await vscode.workspace.fs.readFile(
+          vscode.Uri.file(envPath),
+        );
+        env = dotenv.parse(file.toString());
+        console.log('env', env);
+      }
+    }
+    chatInstance = new TDInstance(os.tmpdir(), { env });
+  }
+  return chatInstance;
+};

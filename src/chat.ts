@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { TDInstance } from './cli';
+import { getChatInstance } from './cli';
 import { getActiveWorkspaceFolder, MarkdownStreamParser } from './utils';
 import spec from './spec';
 
@@ -28,8 +28,7 @@ const handler: vscode.ChatRequestHandler = async (
       const abortController = new AbortController();
       token.onCancellationRequested(() => abortController.abort());
 
-      const file = `testdriver/testdriver_${Date.now()}.yaml`;
-      const instance = new TDInstance(workspace, file);
+      const instance = await getChatInstance();
 
       await instance.run(`/${request.command} ${request.prompt}`, {
         signal: abortController.signal,
@@ -44,7 +43,7 @@ const handler: vscode.ChatRequestHandler = async (
               stream.button({
                 command: 'testdriver.codeblock.run',
                 title: vscode.l10n.t('Run Steps'),
-                arguments: [file, workspace], // Send the YML code as an argument
+                arguments: [event.content], // Send the YML code as an argument
               });
             }
           }

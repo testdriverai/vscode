@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { initialize } from './initialize';
 import { testdriverCommand } from './chat';
+import { getChatInstance } from '../cli';
 
 const registerCtrlPCommands = () => {
   const chatCommands = ['dry', 'try'] as const;
@@ -18,14 +19,10 @@ const registerCtrlPCommands = () => {
 const registerOtherCommands = () => {
   vscode.commands.registerCommand(
     'testdriver.codeblock.run',
-    async (yaml: string, workspace: vscode.WorkspaceFolder) => {
-      console.log('Running codeblock', yaml, 'workspace', workspace);
-      const terminal = vscode.window.createTerminal({
-        name: 'TestDriver',
-        cwd: workspace.uri.fsPath,
-      });
-      terminal.show();
-      terminal.sendText(`testdriverai run ${yaml}`, true);
+    async (yaml: string) => {
+      console.log('Running codeblock');
+      const instance = await getChatInstance();
+      await instance.run(`/yaml ${encodeURIComponent(yaml)}`);
     },
   );
 };
