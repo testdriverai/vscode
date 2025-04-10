@@ -81,14 +81,8 @@ export class MarkdownStreamParser extends EventEmitter<{
   codeblock: [MultilineCodeblock];
 }> {
   inCodeBlock = false;
-  codeBlockLang = '';
   codeBlockContent = '';
-  markdownContent = '';
-  backtickCount = 0;
-  potentialCodeBlockStart = false;
-  potentialCodeBlockEnd = false;
-  languageCapture = false;
-
+  codeBlockLang = '';
   // Buffer for recent characters
   recentChars: string[] = [];
   MAX_RECENT_CHARS = 10;
@@ -98,146 +92,52 @@ export class MarkdownStreamParser extends EventEmitter<{
 
   // Process a single character
   processChar(char: string) {
-    // Add to recent characters buffer for lookahead/lookbehind
+
+    this.emit('markdown', char);
+
+    // Add the character to the recent characters buffer
     this.recentChars.push(char);
     if (this.recentChars.length > this.MAX_RECENT_CHARS) {
-      this.recentChars.shift();
+      this.recentChars.shift(); // Remove the oldest character
     }
 
-    // Handle backticks for code block detection
-    if (char === '`') {
-      this.backtickCount++;
+    // check if the last 3 characters were ```
+    if (this.recentChars.slice(-3).join('') === '```') {
 
-      // If we get 3 backticks, we're either entering or exiting a code block
-      if (this.backtickCount === 3) {
-        if (this.inCodeBlock) {
-          this.potentialCodeBlockEnd = true;
-        } else {
-          this.potentialCodeBlockStart = true;
-          this.languageCapture = true; // Start capturing language after ```
-        }
-      }
-    } else {
-      // Reset backtick counter if we see a non-backtick
-      if (this.backtickCount > 0 && this.backtickCount < 3) {
-        // If we saw some backticks but not 3, add them to the content
-        if (this.inCodeBlock) {
-          this.codeBlockContent += '`'.repeat(this.backtickCount);
-        } else {
-          this.markdownContent += '`'.repeat(this.backtickCount);
-        }
-      }
-      this.backtickCount = 0;
+      this.recentChars = []; // Clear the buffer
 
-      // Handle potential code block starts
-      if (this.potentialCodeBlockStart) {
-        if (this.languageCapture) {
-          // If we're capturing a language and see whitespace, end language capture
-          if (char === '\n' || char === '\r') {
-            this.languageCapture = false;
-            this.inCodeBlock = true;
-            this.potentialCodeBlockStart = false;
-            this.emit('markdown', this.markdownContent.trim());
-            this.markdownContent = '';
-            return;
-          } else {
-            // Otherwise add to language string
-            this.codeBlockLang += char;
-            return; // Skip adding to content
-          }
-        }
+      this.inCodeBlock = !this.inCodeBlock;
+
+      if (!this.inCodeBlock && this.codeBlockContent) {
+
+        const lines = this.codeBlockContent.split('\n');
+
+        this.codeBlockLang = lines[0].replaceAll('`', '').trim();
+        const strippedContent = lines.slice(1, -1).join('\n');
+
+        const codeBlockObj = this.codeBlockLang
+        ? { type: this.codeBlockLang, content: strippedContent }
+        : { content: strippedContent };
+
+        this.emit('codeblock', codeBlockObj);
+        this.codeBlockContent = '';
+        this.codeBlockLang = '';
       }
 
-      // Handle potential code block ends
-      if (this.potentialCodeBlockEnd) {
-        // If we see a newline or carriage return, confirm code block end
-        if (char === '\n' || char === '\r') {
-          // Emit the code block WITHOUT the closing backticks
-          const codeBlockObj = this.codeBlockLang
-            ? { type: this.codeBlockLang, content: this.codeBlockContent }
-            : { content: this.codeBlockContent };
-
-          this.emit('codeblock', codeBlockObj);
-
-          this.codeBlockContent = '';
-          this.codeBlockLang = '';
-          this.inCodeBlock = false;
-          this.potentialCodeBlockEnd = false;
-
-          // Add this newline to the markdown content
-          this.markdownContent = '\n';
-          return;
-        } else {
-          // If we see something other than a newline after ```,
-          // it wasn't a code block end
-          this.potentialCodeBlockEnd = false;
-          this.codeBlockContent += '```' + char;
-          return;
-        }
-      }
-
-      // Add character to the appropriate buffer
-      if (this.inCodeBlock) {
-        this.codeBlockContent += char;
-      } else {
-        this.markdownContent += char;
-        // Emit markdown content incrementally
-        if (this.markdownContent.trim()) {
-          this.emit('markdown', this.markdownContent);
-          this.markdownContent = '';
-        }
-      }
     }
+
+    if (this.inCodeBlock) {
+      this.codeBlockContent += char;
+      this.codeBlockLang = '';
+    }
+
   }
 
   // Call this when the stream ends to emit any remaining content
   end() {
-    // First check if we're in a potential code block end state
-    // This happens when the input ends with ```
-    if (this.potentialCodeBlockEnd && this.inCodeBlock) {
-      // Emit the code block WITHOUT including the closing backticks
-      const codeBlockObj = this.codeBlockLang
-        ? { type: this.codeBlockLang, content: this.codeBlockContent }
-        : { content: this.codeBlockContent };
-
-      this.emit('codeblock', codeBlockObj);
-
-      // Reset state
-      this.inCodeBlock = false;
-      this.codeBlockLang = '';
-      this.codeBlockContent = '';
-      this.markdownContent = '';
-      this.backtickCount = 0;
-      this.potentialCodeBlockEnd = false;
-      return;
-    }
-
-    // Handle any other remaining backticks
-    if (this.backtickCount > 0) {
-      if (this.inCodeBlock) {
-        this.codeBlockContent += '`'.repeat(this.backtickCount);
-      } else {
-        this.markdownContent += '`'.repeat(this.backtickCount);
-      }
-    }
-
-    // Emit any remaining content
-    if (this.inCodeBlock) {
-      const codeBlockObj = this.codeBlockLang
-        ? { type: this.codeBlockLang, content: this.codeBlockContent }
-        : { content: this.codeBlockContent };
-
-      this.emit('codeblock', codeBlockObj);
-    } else if (this.markdownContent.trim()) {
-      this.emit('markdown', this.markdownContent);
-    }
 
     // Reset state
     this.inCodeBlock = false;
-    this.codeBlockLang = '';
     this.codeBlockContent = '';
-    this.markdownContent = '';
-    this.backtickCount = 0;
-    this.potentialCodeBlockEnd = false;
   }
 }

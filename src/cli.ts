@@ -87,9 +87,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
       stdio: 'pipe',
       cwd: this.cwd,
       env: {
-        ...process.env,
-        ...this.env,
-        TD_OVERLAY_ID: this.overlayId,
+      ...process.env,
+      ...this.env,
+      TD_OVERLAY_ID: this.overlayId,
+      FORCE_COLOR: 'true', // Enable color rendering
       },
     });
 
@@ -142,7 +143,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
       const handleMessage = (message: { event: string; data: unknown }) => {
         const { event, data } = message;
-        console.log('event', event, data);
         switch (event) {
           case 'interactive':
             this.emit((data as boolean) ? 'idle' : 'busy');
@@ -181,7 +181,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
       .on('exit', (code) => console.log('[debug:exit]', code))
       .on('stdout', (data) => process.stdout.write(data))
       .on('stderr', (data) => process.stderr.write(data))
-      .on('output', (data) => process.stdout.write(data));
+      // .on('output', (data) => process.stdout.write(data));
   }
 
   async run(

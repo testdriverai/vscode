@@ -24,8 +24,6 @@ const handler: vscode.ChatRequestHandler = async (
     const commands = ['dry', 'try'];
     if (commands.includes(request.command)) {
 
-      stream.progress('Thinking...');
-
       const workspace = getActiveWorkspaceFolder();
       if (!workspace) {
         stream.progress('No workspace found');
@@ -46,29 +44,26 @@ const handler: vscode.ChatRequestHandler = async (
         signal: abortController.signal,
         callback: (event) => {
           console.log('event', event);
+
           if (typeof event === 'string') {
             stream.markdown(event);
           } else {
-            stream.markdown(
-              `\n\n\`\`\`${event.type ?? ''}\n${event.content}\n\`\`\`\n\n`,
-            );
             if (['yaml', 'yml'].includes(event.type?.toLowerCase() ?? '')) {
               stream.button({
                 command: 'testdriver.codeblock.run',
                 title: vscode.l10n.t('Run Steps'),
-                arguments: [event.content], // Send the YML code as an argument
+                arguments: [encodeURIComponent(event.content)], // Send the YML code as an argument
               });
             }
           }
         },
       });
-      // instance.destroy();
     } else {
       stream.progress('Unsupported command: ' + request.command);
     }
     return;
   } else {
-    stream.progress('Thinking...');
+    stream.progress('thinking...');
     console.log(context.history);
 
     try {
@@ -103,9 +98,6 @@ const handler: vscode.ChatRequestHandler = async (
         })
         .on('codeblock', (event) => {
           console.log('codeblock', event);
-          stream.markdown(
-            `\n\n\`\`\`${event.type ?? ''}\n${event.content}\n\`\`\`\n\n`,
-          );
           if (['yaml', 'yml'].includes(event.type?.toLowerCase() ?? '')) {
             stream.button({
               command: 'testdriver.codeblock.run',
