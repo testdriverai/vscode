@@ -1129,7 +1129,7 @@ jobs:
     name: "TestDriver Test 1"
     runs-on: ubuntu-latest
     steps:
-    - uses: dashcamio/testdriver@main
+    - uses: testdriverai/action@main
       with:
         version: v4.0.0
         key: \${{secrets.TESTDRIVER_API_KEY}}
@@ -1143,7 +1143,7 @@ test2:
 name: "TestDriver Test 2"
 runs-on: ubuntu-latest
 steps:
-  - uses: dashcamio/testdriver@main
+  - uses: testdriverai/action@main
     with:
       version: v4.0.0
       key: \${{secrets.TESTDRIVER_API_KEY}}
@@ -1317,7 +1317,7 @@ jobs:
  runs-on: ubuntu-latest
  id: run-testdriver
  steps:
- - uses: dashcamio/testdriver@main
+ - uses: testdriverai/action@main
  version: v4.0.0
  key: \${{secrets.TESTDRIVER_API_KEY}}
  with:
