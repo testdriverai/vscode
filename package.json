@@ -178,13 +178,17 @@
     "watch": "tsc -watch"
   },
   "dependencies": {
+    "arktype": "^2.1.19",
     "dotenv": "^16.4.7",
+    "js-yaml": "^4.1.0",
+    "js-yaml-source-map": "^0.2.2",
     "node-ipc": "^12.0.0",
     "vscode": "^1.1.37"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@stylistic/eslint-plugin": "^2.9.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.17.30",
     "@types/node-ipc": "^9.2.3",
     "@types/vscode": "^1.95.0",

@@ -285,9 +285,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
 }
 
 let chatInstance: TDInstance | null = null;
-
 export const getChatInstance = async () => {
-
   console.log('getChatInstance', chatInstance);
 
   if (!chatInstance || chatInstance.state === 'exit') {
@@ -307,4 +305,27 @@ export const getChatInstance = async () => {
     chatInstance = new TDInstance(os.tmpdir(), { env });
   }
   return chatInstance;
+};
+
+let testInstance: TDInstance | null = null;
+export const getTestInstance = async () => {
+  console.log('getTestInstance', testInstance);
+
+  if (!testInstance || testInstance.state === 'exit') {
+    console.log('Creating new test instance');
+    const workingDir = getActiveWorkspaceFolder()?.uri.fsPath;
+    let env: Record<string, string> = {};
+    if (workingDir) {
+      const envPath = path.join(workingDir, '.env');
+      if (fs.existsSync(envPath)) {
+        const file = await vscode.workspace.fs.readFile(
+          vscode.Uri.file(envPath),
+        );
+        env = dotenv.parse(file.toString());
+        console.log('env', env);
+      }
+    }
+    testInstance = new TDInstance(workingDir ?? os.tmpdir(), { env });
+  }
+  return testInstance;
 };
