@@ -18,6 +18,7 @@ const { IPC } = nodeIPC;
 
 interface EventsMap {
   vm_url: [string];
+  status: [string];
   stdout: [string];
   stderr: [string];
   exit: [number | null];
