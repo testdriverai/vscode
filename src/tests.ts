@@ -211,7 +211,7 @@ const setupRunProfiles = (controller: vscode.TestController) => {
       if (request.exclude?.includes(test)) {
         return;
       }
-      queue.unshift(test);
+      queue.push(test);
       run.enqueued(test);
     };
 
@@ -222,7 +222,7 @@ const setupRunProfiles = (controller: vscode.TestController) => {
     }
 
     while (queue.length > 0 && !token.isCancellationRequested) {
-      const test = queue.pop()!;
+      const test = queue.shift()!;
 
       if (test.children.size === 0) {
         run.started(test);
@@ -266,7 +266,7 @@ const setupRunProfiles = (controller: vscode.TestController) => {
 
         console.log(`Test ${test.id} finished`);
       } else {
-        [...test.children].reverse().forEach(([_id, test]) => addToQueue(test));
+        test.children.forEach(addToQueue);
       }
     }
 
