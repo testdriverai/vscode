@@ -23,7 +23,7 @@ const registerOtherCommands = () => {
       console.log('Running codeblock');
       console.log(yaml)
       const instance = await getChatInstance();
-      await instance.run(`/yaml ${yaml}`);
+      await instance.run(`/yaml ${decodeURIComponent(yaml)}`);
     },
   );
 };
@@ -31,4 +31,12 @@ const registerOtherCommands = () => {
 export const registerCommands = () => {
   registerCtrlPCommands();
   registerOtherCommands();
+
+  vscode.commands.registerCommand('testdriver.walkthrough', () => {
+    vscode.commands.executeCommand(
+      'vscode.openWalkthrough',
+      'testdriver#testdriver',
+      true
+    );
+  });
 };

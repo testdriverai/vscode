@@ -50,7 +50,7 @@ const refreshTests = async (
         .split('/'),
     }))
     .filter(({ parts }) => {
-      return !['', 'generate', 'screenshots'].includes(parts[0]);
+      return !['', 'lifecycle', 'screenshots'].includes(parts[0]);
       // && !/\.tmp\.ya?ml$/i.test(parts[parts.length - 1])
     });
 
@@ -131,6 +131,8 @@ const setupRunProfiles = (controller: vscode.TestController) => {
         instance.on('stderr', (data) => {
           run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
         });
+
+        console.log(`Running test ${relativePath}...`);
 
         await instance
           .run(`/run ${relativePath}`, {

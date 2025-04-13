@@ -33,9 +33,15 @@ const handler: vscode.ChatRequestHandler = async (
       const abortController = new AbortController();
       token.onCancellationRequested(() => abortController.abort());
 
-      const instance = await getChatInstance();
+      const instance = (await getChatInstance()) as unknown as {
+        on: (event: 'status', handler: (status: string) => void) => void;
+        focus: () => void;
+        run: (command: string, options: { signal: AbortSignal; callback: (event: any) => void }) => Promise<void>;
+      };
 
-      instance.on('status', (status) => {
+      instance.focus();
+
+      instance.on('status', (status: string) => {
         console.log('status', status);
         stream.progress(status);
       });
@@ -102,7 +108,7 @@ const handler: vscode.ChatRequestHandler = async (
             stream.button({
               command: 'testdriver.codeblock.run',
               title: vscode.l10n.t('Run Steps'),
-              arguments: [event.content], // Send the YML code as an argument
+              arguments: [encodeURIComponent(event.content)], // Send the YML code as an argument
             });
           }
         });

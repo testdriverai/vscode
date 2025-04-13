@@ -25,6 +25,7 @@ interface EventsMap {
   pending: [];
   idle: [];
   busy: [];
+  status: [string]; // Added the 'status' event
 }
 
 const MAX_RETRIES = 10;
@@ -83,6 +84,11 @@ export class TDInstance extends EventEmitter<EventsMap> {
     if (this.file) {
       args.push(this.file);
     }
+
+    console.log('args', args);
+    console.log(args)
+
+
     this.process = spawn(`testdriverai`, args, {
       stdio: 'pipe',
       cwd: this.cwd,
@@ -273,6 +279,33 @@ export class TDInstance extends EventEmitter<EventsMap> {
       });
   }
 
+  async focus() {
+
+    console.log('focus called')
+    const uri = vscode.Uri.file(path.join(this.cwd, this.file || 'testdriver.yaml'));
+    const doc = await vscode.workspace.openTextDocument(uri);
+    const editor = await vscode.window.showTextDocument(doc, {
+      preview: true,
+    });
+
+    // Scroll to the end of the file
+    if (editor) {
+      const doc = editor.document;
+      const lastLine = doc.lineCount - 1;
+      const lastChar = doc.lineAt(lastLine).range.end;
+
+      const position = new vscode.Position(lastLine, lastChar.character);
+      editor.selection = new vscode.Selection(position, position);
+
+      editor.revealRange(
+        new vscode.Range(position, position),
+        vscode.TextEditorRevealType.InCenterIfOutsideViewport
+      );
+    }
+
+
+  }
+
   destroy() {
     this.process.stdout?.removeAllListeners();
     this.process.stderr?.removeAllListeners();
@@ -300,10 +333,39 @@ export const getChatInstance = async () => {
           vscode.Uri.file(envPath),
         );
         env = dotenv.parse(file.toString());
-        console.log('env', env);
       }
     }
-    chatInstance = new TDInstance(os.tmpdir(), { env });
+
+    let dir = fs.mkdtempSync(path.join(os.tmpdir(), 'testdriver-'));
+    dir = path.join(dir, 'testdriver');
+
+    console.log('temp dir', dir);
+
+    // make a testdriver folder inside
+    // the temp directory
+    fs.mkdirSync(dir, { recursive: true });
+
+    // make a testdriver.yaml file inside
+    // the testdriver folder
+    const testdriverYaml = path.join(dir, 'testdriver.yaml');
+    fs.writeFileSync(testdriverYaml, '', { flag: 'w' });
+
+    // copy the testdrivier directory from the working dir
+    // to the temp directory
+    // const testdriverDir = path.join(workingDir ?? '', 'testdriver');
+    // if (fs.existsSync(testdriverDir)) {
+    //   fs.cpSync(testdriverDir, path.join(dir, 'testdriver'), {
+    //     recursive: true,
+    //   });
+    // }
+
+    // open dir/testdriver.yaml in the vscode editor
+
+//  /private/var/folders/7s/2nhyb0rj2bs_rkswlgqnnhdm0000gn/T/testdriver/testdriver.yaml
+
+    chatInstance = new TDInstance(dir, { env, file: 'testdriver.yaml' });
+
+
   }
   return chatInstance;
 };
