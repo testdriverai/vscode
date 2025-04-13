@@ -26,7 +26,6 @@ interface EventsMap {
   pending: [];
   idle: [];
   busy: [];
-  status: [string]; // Added the 'status' event
 }
 
 const MAX_RETRIES = 10;
@@ -354,12 +353,12 @@ export const getChatInstance = async () => {
     const now = new Date();
     const formattedDate = now.toLocaleString('en-US', {
       year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
       hour12: true,
-    }).replace(/, /g, ' - ').replace(/:/g, '-').replace(/ /g, '_');
+    }).replace(/, /g, '_').replace(/:/g, '-').replace(/ /g, '_');
     const testdriverYaml = path.join(dir, `${formattedDate}.yaml`);
     fs.writeFileSync(testdriverYaml, '', { flag: 'w' });
 
@@ -376,7 +375,7 @@ export const getChatInstance = async () => {
 
 //  /private/var/folders/7s/2nhyb0rj2bs_rkswlgqnnhdm0000gn/T/testdriver/testdriver.yaml
 
-    chatInstance = new TDInstance(dir, { env, file: `${formattedDate}.yaml });
+    chatInstance = new TDInstance(dir, { env, file: `${formattedDate}.yaml` });
 
 
   }

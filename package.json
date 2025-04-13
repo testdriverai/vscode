@@ -23,8 +23,8 @@
     "walkthroughs": [
       {
         "id": "gettingStarted",
-        "title": "Getting Started with TestDriver",
-        "description": "A sample walkthrough",
+        "title": "TestDriver Walkthrough",
+        "description": "Test your app with a computer-use agent in minutes.\nThis walkthrough will show you how to set up TestDriver and run your first test.",
         "steps": [
           {
             "id": "init",
@@ -35,18 +35,95 @@
           },
           {
             "id": "chat",
-            "title": "Open GitHub Copilot Chat",
-            "description": "This step will change a setting and check off when the setting has changed\n[Change Setting](command:workbench.action.chat.open)",
+            "title": "Chat with TestDriver",
+            "description": "You can talk to testdrivery by tagging them in chat. \n[Open Chat](command:workbench.action.chat.open)",
             "media": { "markdown": "tutorial/chat.md" },
             "completionEvents": ["onCommand:workbench.action.chat.open"]
           },
           {
             "id": "try",
-            "title": "Tell TestDriver what to do",
-            "description": "Type `@testdriverai /try click on the menu bar` in the chat window.\n[Try it out](command:testdriver.try)",
+            "title": "Build your first test",
+            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:testdriver.try)",
             "media": { "markdown": "tutorial/try.md" },
             "completionEvents": ["onCommand:testdriver.try"]
+          },
+          {
+            "id": "run",
+            "title": "Run your test",
+            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:testing.runAll)",
+            "media": { "markdown": "tutorial/try.md" },
+            "completionEvents": ["onCommand:testing.runAll"]
           }
+        ]
+      },
+      {
+        "id": "generate",
+        "title": "TestDriver Generation Walkthrough",
+        "description": "Test your app with a computer-use agent in minutes.\nThis walkthrough will show you how to set up TestDriver and run your first test.",
+        "steps": [
+          {
+            "id": "terminal",
+            "title": "Open a Terminal",
+            "description": "Open a terminal in VS Code to interact with your project.\n[Open Terminal](command:workbench.action.terminal.new)",
+            "media": { "markdown": "tutorial/terminal.md" },
+            "completionEvents": ["onCommand:workbench.action.terminal.new"]
+          },
+            {
+            "id": "web",
+            "title": "Run TestDriver Generate",
+            "description": "Run the TestDriver web test by typing `web 5` in the terminal.\n[Run Test](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22%2Fgenerate%20web%205%5Cn%22%7D)",
+            "media": { "markdown": "tutorial/web.md" },
+            "completionEvents": ["onCommand:workbench.action.terminal.sendSequence"]
+            },
+          {
+            "id": "run",
+            "title": "Run your test",
+            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:testing.runAll)",
+            "media": { "markdown": "tutorial/try.md" },
+            "completionEvents": ["onCommand:testing.runAll"]
+          }
+        ]
+      },
+      {
+        "id": "deploy",
+        "title": "TestDriver Deployment Walkthrough",
+        "description": "Test your app with a computer-use agent in minutes.\nThis walkthrough will show you how to set up TestDriver and run your first test.",
+        "steps": [
+          {
+            "id": "branch",
+            "title": "Create a new branch",
+            "description": "Type `@testdriverai /branch create new-feature` in the chat window. TestDriver will create a new branch for your changes.\n[Create Branch](command:git.branch)",
+            "media": { "markdown": "tutorial/branch.md" },
+            "completionEvents": ["onCommand:git.branch"]
+          },
+          {
+            "id": "stage",
+            "title": "Stage your new tests",
+            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:git.stageAll)",
+            "media": { "markdown": "tutorial/try.md" },
+            "completionEvents": ["onCommand:git.stageAll"]
+          },
+          {
+            "id": "commit",
+            "title": "Commit your tests",
+            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:git.commit)",
+            "media": { "markdown": "tutorial/try.md" },
+            "completionEvents": ["onCommand:git.commit"]
+          },
+          {
+            "id": "push",
+            "title": "Push new tests",
+            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:git.push)",
+            "media": { "markdown": "tutorial/try.md" },
+            "completionEvents": ["onCommand:git.push"]
+          },
+            {
+            "id": "deploy",
+            "title": "Deploy your app",
+            "description": "Click the link below to deploy your app.\n[Deploy Now](https://docs.testdriver.ai/guides/github-actions/github-action-setup)",
+            "media": { "markdown": "tutorial/deploy.md" },
+            "completionEvents": ["onLink:https://docs.testdriver.ai/guides/github-actions/github-action-setup"]
+            }
         ]
       }
     ],
@@ -93,7 +170,15 @@
     "commands": [
       {
         "command": "testdriver.walkthrough",
-        "title": "TestDriver: Start Walkthrough"
+        "title": "TestDriver: Start Walkthrough Introduction"
+      },
+      {
+        "command": "testdriver.walkthroughDeploy",
+        "title": "TestDriver: Start Walkthrough for Deployment"
+      },
+      {
+        "command": "testdriver.walkthroughGenerate",
+        "title": "TestDriver: Start Walkthrough for Test Generation"
       },
       {
         "command": "testdriver.init",

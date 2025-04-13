@@ -42,4 +42,12 @@ export const registerCommands = () => {
       true
     );
   });
+  vscode.commands.registerCommand('testdriver.walkthroughDeploy', () => {
+
+    vscode.commands.executeCommand(
+      'workbench.action.openWalkthrough',
+      'testdriverai.testdriver#deploy',
+      true
+    );
+  });
 };

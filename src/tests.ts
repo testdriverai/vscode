@@ -133,28 +133,6 @@ const setupRunProfiles = (controller: vscode.TestController) => {
 
         console.log(`Running test ${relativePath}...`);
 
-        const file = (await vscode.workspace.fs.readFile(test.uri!)).toString();
-        const loaded = (await types).File(yaml.load(file));
-        if (loaded instanceof (await import('arktype')).type.errors) {
-          continue;
-        }
-
-        const path =
-          test.id
-            .split(':')?.[1]
-            ?.split('.')
-            .map((part) => (isNaN(parseInt(part)) ? part : parseInt(part))) ??
-          [];
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let cursor: any = loaded;
-        for (const part of path) {
-          cursor = cursor[part];
-        }
-
-        const block = yaml.dump(cursor);
-        console.log({ loaded, path, cursor, block });
-
         await instance
           .run(`/run ${relativePath}`, {
             signal: abortController.signal,
