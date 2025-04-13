@@ -21,9 +21,9 @@ const registerOtherCommands = () => {
     'testdriver.codeblock.run',
     async (yaml: string) => {
       console.log('Running codeblock');
-      console.log(yaml)
+      console.log(yaml);
       const instance = await getChatInstance();
-      await instance.run(`/yaml ${decodeURIComponent(yaml)}`);
+      await instance.run(`/yaml ${encodeURIComponent(yaml)}`);
     },
   );
 };

@@ -58,7 +58,7 @@ const handler: vscode.ChatRequestHandler = async (
               stream.button({
                 command: 'testdriver.codeblock.run',
                 title: vscode.l10n.t('Run Steps'),
-                arguments: [encodeURIComponent(event.content)], // Send the YML code as an argument
+                arguments: [event.content], // Send the YML code as an argument
               });
             }
           }
