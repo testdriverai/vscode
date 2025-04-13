@@ -41,7 +41,7 @@ export async function isFileType(
   );
 }
 
-export function unslugify(name: string) {
+export function beautifyFilename(name: string) {
   return name
     .split('/')
     .pop()!
@@ -141,18 +141,3 @@ export class MarkdownStreamParser extends EventEmitter<{
     this.codeBlockContent = '';
   }
 }
-
-export const asyncFilter = async <T>(
-  array: T[],
-  predicate: (item: T) => Promise<boolean>,
-): Promise<T[]> => {
-  const results: T[] = [];
-
-  for (const item of array) {
-    if (await predicate(item)) {
-      results.push(item);
-    }
-  }
-
-  return results;
-};

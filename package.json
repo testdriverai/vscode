@@ -130,7 +130,6 @@
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@stylistic/eslint-plugin": "^2.9.0",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.17.30",
     "@types/node-ipc": "^9.2.3",
     "@types/vscode": "^1.95.0",
