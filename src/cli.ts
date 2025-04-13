@@ -68,6 +68,9 @@ export class TDInstance extends EventEmitter<EventsMap> {
     this.client.config.maxRetries = MAX_RETRIES;
     this.client.config.silent = true;
 
+
+    console.log(this.cwd, this.env);
+
     const terminal = vscode.window.createTerminal({
       name: `TestDriver AI - vscode extension`,
       cwd: this.cwd,
@@ -187,7 +190,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
       .on('exit', (code) => console.log('[debug:exit]', code))
       .on('stdout', (data) => process.stdout.write(data))
       .on('stderr', (data) => process.stderr.write(data))
-      // .on('output', (data) => process.stdout.write(data));
+      .on('output', (data) => process.stdout.write(data));
   }
 
   async run(
@@ -335,19 +338,28 @@ export const getChatInstance = async () => {
         env = dotenv.parse(file.toString());
       }
     }
+    const dir = path.join(workingDir ?? '', 'testdriver');
 
-    let dir = fs.mkdtempSync(path.join(os.tmpdir(), 'testdriver-'));
-    dir = path.join(dir, 'testdriver');
-
-    console.log('temp dir', dir);
+    console.log('workspace testdriver dir', dir);
 
     // make a testdriver folder inside
-    // the temp directory
-    fs.mkdirSync(dir, { recursive: true });
+    // the workspace directory if it doesn't exist
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
 
     // make a testdriver.yaml file inside
     // the testdriver folder
-    const testdriverYaml = path.join(dir, 'testdriver.yaml');
+    const now = new Date();
+    const formattedDate = now.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true,
+    }).replace(/, /g, ' - ').replace(/:/g, '-').replace(/ /g, '_');
+    const testdriverYaml = path.join(dir, `${formattedDate}.yaml`);
     fs.writeFileSync(testdriverYaml, '', { flag: 'w' });
 
     // copy the testdrivier directory from the working dir
@@ -363,7 +375,7 @@ export const getChatInstance = async () => {
 
 //  /private/var/folders/7s/2nhyb0rj2bs_rkswlgqnnhdm0000gn/T/testdriver/testdriver.yaml
 
-    chatInstance = new TDInstance(dir, { env, file: 'testdriver.yaml' });
+    chatInstance = new TDInstance(dir, { env, file: `${formattedDate}.yaml });
 
 
   }

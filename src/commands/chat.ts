@@ -7,7 +7,7 @@ const getUserPrompt = async () => {
     userInput = await vscode.window.showInputBox({
       value: '',
       prompt: 'Prompt for TestDriver',
-      placeHolder: 'Your prompt ...',
+      placeHolder: 'Click on "Sign In',
       validateInput: (text) => {
         if (!text?.trim().length) {
           return 'Prompt cannot be empty';

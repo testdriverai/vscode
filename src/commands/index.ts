@@ -33,9 +33,12 @@ export const registerCommands = () => {
   registerOtherCommands();
 
   vscode.commands.registerCommand('testdriver.walkthrough', () => {
+
+    console.log('Opening walkthrough');
+
     vscode.commands.executeCommand(
-      'vscode.openWalkthrough',
-      'testdriver#testdriver',
+      'workbench.action.openWalkthrough',
+      'testdriverai.testdriver#gettingStarted',
       true
     );
   });

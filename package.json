@@ -22,28 +22,28 @@
   "contributes": {
     "walkthroughs": [
       {
-        "id": "testdriver",
+        "id": "gettingStarted",
         "title": "Getting Started with TestDriver",
         "description": "A sample walkthrough",
         "steps": [
           {
             "id": "init",
-            "title": "Setup TestDriver in the active workspace",
-            "description": "This step will run a command and check off once it has been run.",
+            "title": "Set up TestDriver",
+            "description": "Install TestDriver in the active workspace via NPM.\n[Run Setup](command:testdriver.init)",
             "media": { "markdown": "tutorial/init.md" },
             "completionEvents": ["onCommand:testdriver.init"]
           },
           {
             "id": "chat",
             "title": "Open GitHub Copilot Chat",
-            "description": "This step will change a setting and check off when the setting has changed\n[Change Setting](command:getting-started-sample.changeSetting)",
+            "description": "This step will change a setting and check off when the setting has changed\n[Change Setting](command:workbench.action.chat.open)",
             "media": { "markdown": "tutorial/chat.md" },
-            "completionEvents": ["onCommand:github.copilot-chat.open"]
+            "completionEvents": ["onCommand:workbench.action.chat.open"]
           },
           {
             "id": "try",
-            "title": "Change Setting",
-            "description": "Type /try click on the menu bar",
+            "title": "Tell TestDriver what to do",
+            "description": "Type `@testdriverai /try click on the menu bar` in the chat window.\n[Try it out](command:testdriver.try)",
             "media": { "markdown": "tutorial/try.md" },
             "completionEvents": ["onCommand:testdriver.try"]
           }
@@ -92,7 +92,7 @@
     "languageModelTools": [],
     "commands": [
       {
-        "name": "testdriver.walkthrough",
+        "command": "testdriver.walkthrough",
         "title": "TestDriver: Start Walkthrough"
       },
       {
