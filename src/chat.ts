@@ -49,7 +49,6 @@ const handler: vscode.ChatRequestHandler = async (
       await instance.run(`/${request.command} ${request.prompt}`, {
         signal: abortController.signal,
         callback: (event) => {
-          console.log('event', event);
 
           if (typeof event === 'string') {
             stream.markdown(event);

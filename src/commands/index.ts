@@ -50,4 +50,12 @@ export const registerCommands = () => {
       true
     );
   });
+  vscode.commands.registerCommand('testdriver.walkthroughGenerate', () => {
+
+    vscode.commands.executeCommand(
+      'workbench.action.openWalkthrough',
+      'testdriverai.testdriver#generate',
+      true
+    );
+  });
 };

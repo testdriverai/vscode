@@ -29,7 +29,7 @@
           {
             "id": "init",
             "title": "Set up TestDriver",
-            "description": "Install TestDriver in the active workspace via NPM.\n[Run Setup](command:testdriver.init)",
+            "description": "Install & configure TestDriver in the active workspace via NPM .\n[Run Setup](command:testdriver.init)",
             "media": { "markdown": "tutorial/init.md" },
             "completionEvents": ["onCommand:testdriver.init"]
           },
@@ -67,6 +67,13 @@
             "description": "Open a terminal in VS Code to interact with your project.\n[Open Terminal](command:workbench.action.terminal.new)",
             "media": { "markdown": "tutorial/terminal.md" },
             "completionEvents": ["onCommand:workbench.action.terminal.new"]
+          },
+          {
+          "id": "interactive",
+          "title": "Run TestDriver Interactive",
+          "description": "Run the TestDriver web test by typing `web 5` in the terminal.\n[Run Test](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
+          "media": { "markdown": "tutorial/web.md" },
+          "completionEvents": ["onCommand:workbench.action.terminal.sendSequence"]
           },
             {
             "id": "web",
@@ -170,15 +177,15 @@
     "commands": [
       {
         "command": "testdriver.walkthrough",
-        "title": "TestDriver: Start Walkthrough Introduction"
-      },
-      {
-        "command": "testdriver.walkthroughDeploy",
-        "title": "TestDriver: Start Walkthrough for Deployment"
+        "title": "TestDriver: Setup Guide"
       },
       {
         "command": "testdriver.walkthroughGenerate",
-        "title": "TestDriver: Start Walkthrough for Test Generation"
+        "title": "TestDriver: Test Generation Guide"
+      },
+      {
+        "command": "testdriver.walkthroughDeploy",
+        "title": "TestDriver: Deployment Guide"
       },
       {
         "command": "testdriver.init",

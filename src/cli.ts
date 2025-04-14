@@ -351,31 +351,12 @@ export const getChatInstance = async () => {
     // make a testdriver.yaml file inside
     // the testdriver folder
     const now = new Date();
-    const formattedDate = now.toLocaleString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    }).replace(/, /g, '_').replace(/:/g, '-').replace(/ /g, '_');
-    const testdriverYaml = path.join(dir, `${formattedDate}.yaml`);
+    const formattedDate = now.toISOString().replace(/[:.]/g, '-');
+    const file = `testdriver_${formattedDate}.yaml`;
+    const testdriverYaml = path.join(dir, file);
     fs.writeFileSync(testdriverYaml, '', { flag: 'w' });
 
-    // copy the testdrivier directory from the working dir
-    // to the temp directory
-    // const testdriverDir = path.join(workingDir ?? '', 'testdriver');
-    // if (fs.existsSync(testdriverDir)) {
-    //   fs.cpSync(testdriverDir, path.join(dir, 'testdriver'), {
-    //     recursive: true,
-    //   });
-    // }
-
-    // open dir/testdriver.yaml in the vscode editor
-
-//  /private/var/folders/7s/2nhyb0rj2bs_rkswlgqnnhdm0000gn/T/testdriver/testdriver.yaml
-
-    chatInstance = new TDInstance(dir, { env, file: `${formattedDate}.yaml` });
+    chatInstance = new TDInstance(dir, { env, file});
 
 
   }
