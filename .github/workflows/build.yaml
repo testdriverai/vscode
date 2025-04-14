@@ -35,7 +35,7 @@ jobs:
           echo "vsix_path=$VSIX_PATH" >> $GITHUB_OUTPUT
 
       - name: Upload .vsix as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact
         with:
           name: vscode-extension
           path: ${{ steps.get_vsix.outputs.vsix_path }}
