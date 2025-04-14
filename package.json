@@ -238,8 +238,7 @@
     "ws": "^8.18.1",
     "arktype": "^2.1.19",
     "js-yaml": "^4.1.0",
-    "js-yaml-source-map": "^0.2.2",
-    "vscode": "^1.1.37"
+    "js-yaml-source-map": "^0.2.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
