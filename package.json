@@ -1,8 +1,9 @@
 {
   "name": "testdriver",
   "publisher": "testdriverai",
-  "displayName": "TestDriver VS Code Extension",
+  "displayName": "TestDriver AI QA Agent",
   "description": "AI QA Agents",
+  "icon": "/images/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/Microsoft/vscode-extension-samples"
@@ -14,6 +15,9 @@
   "categories": [
     "AI",
     "Chat"
+  ],
+  "keywords": [
+    "ai", "test", "computer-use", "qa", "automation"
   ],
   "activationEvents": [
     "onChatParticipant:testdriver.driver", "workspaceContains:testdriver/**"
@@ -229,7 +233,8 @@
     "compile": "tsc",
     "format": "prettier --write .",
     "lint": "eslint",
-    "watch": "tsc -watch"
+    "watch": "tsc -watch",
+    "build": "tsc && vsce package"
   },
   "dependencies": {
     "dotenv": "^16.5.0",
