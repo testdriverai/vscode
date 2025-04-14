@@ -17,6 +17,10 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Install global dependencies
+        run: |
+          npm install -g typescript prettier eslint vsce
+
       - name: Install dependencies
         run: npm install
 
