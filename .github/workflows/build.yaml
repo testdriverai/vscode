@@ -1,0 +1,39 @@
+name: Build and Release VSIX
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run build
+        run: npm run build
+
+      - name: Find .vsix file
+        id: get_vsix
+        run: |
+          VSIX_PATH=$(find . -name "*.vsix" | head -n 1)
+          echo "Found VSIX at $VSIX_PATH"
+          echo "vsix_path=$VSIX_PATH" >> $GITHUB_OUTPUT
+
+      - name: Upload .vsix to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.get_vsix.outputs.vsix_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
