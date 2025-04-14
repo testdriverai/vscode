@@ -1,11 +1,11 @@
-name: Build and Release VSIX
+name: Build VSIX and Upload Artifact
 
 on:
   workflow_dispatch:
   push:
 
 jobs:
-  build-and-release:
+  build-and-upload:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,10 +21,10 @@ jobs:
         run: |
           npm install -g typescript prettier eslint vsce
 
-      - name: Install dependencies
+      - name: Install project dependencies
         run: npm install
 
-      - name: Run build
+      - name: Build .vsix package
         run: npm run build
 
       - name: Find .vsix file
@@ -34,9 +34,8 @@ jobs:
           echo "Found VSIX at $VSIX_PATH"
           echo "vsix_path=$VSIX_PATH" >> $GITHUB_OUTPUT
 
-      - name: Upload .vsix to GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Upload .vsix as artifact
+        uses: actions/upload-artifact@v3
         with:
-          files: ${{ steps.get_vsix.outputs.vsix_path }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: vscode-extension
+          path: ${{ steps.get_vsix.outputs.vsix_path }}
