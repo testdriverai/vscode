@@ -1,192 +1,258 @@
 {
-	"name": "testdriver",
-	"publisher": "vscode-samples",
-	"displayName": "TestDriver VS Code Extension",
-	"description": "AI QA Agents",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/Microsoft/vscode-extension-samples"
-	},
-	"version": "0.1.0",
-	"engines": {
-		"vscode": "^1.95.0"
-	},
-	"categories": [
-		"AI",
-		"Chat"
-	],
-	"activationEvents": [
-		"*"
-	],
-	"contributes": {
-		"chatParticipants": [
-			{
-				"id": "testdriver.driver",
-				"fullName": "TestDriver",
-				"name": "testdriver",
-				"description": "What can I test for you?",
-				"isSticky": true,
-				"commands": [
-					{
-						"name": "dry",
-						"description": "Generate TestDriver steps using a desktop screenshot",
-						"disambiguation": [
-							{
-								"category": "exec",
-								"description": "The user wants to try steps before executing them.",
-								"examples": [
-									"open browser and navigate to airbnb.com",
-									"fill out this form"
-								]
-							}
-						]
-					},
-					{
-						"name": "try",
-						"description": "Generate TestDriver steps using a desktop screenshot",
-						"disambiguation": [
-							{
-								"category": "exec",
-								"description": "The user wants to automate a workflow in one step",
-								"examples": [
-									"open browser and navigate to airbnb.com",
-									"fill out this form"
-								]
-							}
-						]
-					}
-				]
-			},
-			{
-				"id": "chat-tools-sample.tools",
-				"fullName": "Tool User",
-				"name": "tools",
-				"description": "I use tools",
-				"isSticky": true,
-				"commands": [
-					{
-						"name": "list",
-						"description": "List all available tools"
-					},
-					{
-						"name": "all",
-						"description": "Use all registered tools. By default, only this extension's tools are used."
-					}
-				]
-			},
-			{
-				"id": "chat-tools-sample.catTools",
-				"fullName": "Cat (Tools)",
-				"name": "catTools",
-				"description": "I use tools, implemented using @vscode/chat-extension-utils, and am also a cat",
-				"isSticky": true,
-				"commands": [
-					{
-						"name": "all",
-						"description": "Use all registered tools. By default, only this extension's tools are used."
-					}
-				]
-			}
-		],
-		"languageModelTools": [
-			{
-				"name": "chat-tools-sample_tabCount",
-				"tags": [
-					"editors",
-					"chat-tools-sample"
-				],
-				"toolReferenceName": "tabCount",
-				"displayName": "Tab Count",
-				"modelDescription": "The number of active tabs in a tab group",
-				"icon": "$(files)",
-				"inputSchema": {
-					"type": "object",
-					"properties": {
-						"tabGroup": {
-							"type": "number",
-							"description": "The index of the tab group to check. This is optional- if not specified, the active tab group will be checked.",
-							"default": 0
-						}
-					}
-				}
-			},
-			{
-				"name": "chat-tools-sample_findFiles",
-				"tags": [
-					"files",
-					"search",
-					"chat-tools-sample"
-				],
-				"displayName": "Find Files",
-				"modelDescription": "Search for files in the current workspace",
-				"inputSchema": {
-					"type": "object",
-					"properties": {
-						"pattern": {
-							"type": "string",
-							"description": "Search for files that match this glob pattern"
-						}
-					},
-					"required": [
-						"pattern"
-					]
-				}
-			},
-			{
-				"name": "chat-tools-sample_runInTerminal",
-				"tags": [
-					"terminal",
-					"chat-tools-sample"
-				],
-				"displayName": "Run in Terminal",
-				"modelDescription": "Run a command in a terminal and return the output",
-				"inputSchema": {
-					"type": "object",
-					"properties": {
-						"command": {
-							"type": "string",
-							"description": "The command to run"
-						}
-					},
-					"required": [
-						"command"
-					]
-				}
-			}
-		],
-		"commands": [
-			{
-				"command": "dry",
-				"title": "Analyze screen and generate test steps, but don't run them."
-			},
-			{
-				"command": "try",
-				"title": "Analyze screen and generate test steps, then run."
-			}
-		]
-	},
-	"main": "./out/extension.js",
-	"scripts": {
-		"vscode:prepublish": "npm run compile",
-		"compile": "tsc -p ./",
-		"lint": "eslint",
-		"watch": "tsc -watch -p ./"
-	},
-	"dependencies": {
-		"@vscode/chat-extension-utils": "^0.0.0-alpha.1",
-		"@vscode/prompt-tsx": "^0.3.0-alpha.12",
-		"markdown-parser": "^0.0.8",
-		"vscode": "^1.1.37",
-		"ws": "^8.18.1"
-	},
-	"devDependencies": {
-		"@eslint/js": "^9.13.0",
-		"@stylistic/eslint-plugin": "^2.9.0",
-		"@types/node": "^20",
-		"@types/vscode": "^1.95.0",
-		"@types/ws": "^8.18.0",
-		"eslint": "^9.13.0",
-		"typescript": "^5.8.2",
-		"typescript-eslint": "^8.26.0"
-	}
+  "name": "testdriver",
+  "publisher": "testdriverai",
+  "displayName": "TestDriver VS Code Extension",
+  "description": "AI QA Agents",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Microsoft/vscode-extension-samples"
+  },
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "activationEvents": [
+    "onChatParticipant:testdriver.driver", "workspaceContains:testdriver/**"
+
+  ],
+  "contributes": {
+    "walkthroughs": [
+      {
+        "id": "gettingStarted",
+        "title": "TestDriver Walkthrough",
+        "description": "Test your app with a computer-use agent in minutes.\nThis walkthrough will show you how to set up TestDriver and run your first test.",
+        "steps": [
+          {
+            "id": "init",
+            "title": "Set up TestDriver",
+            "description": "Install & configure TestDriver in the active workspace via NPM .\n[Run Setup](command:testdriver.init)",
+            "media": { "markdown": "tutorial/init.md" },
+            "completionEvents": ["onCommand:testdriver.init"]
+          },
+          {
+            "id": "chat",
+            "title": "Chat with TestDriver",
+            "description": "You can talk to testdrivery by tagging them in chat. \n[Open Chat](command:workbench.action.chat.open)",
+            "media": { "markdown": "tutorial/chat.md" },
+            "completionEvents": ["onCommand:workbench.action.chat.open"]
+          },
+          {
+            "id": "try",
+            "title": "Build your first test",
+            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:testdriver.try)",
+            "media": { "markdown": "tutorial/try.md" },
+            "completionEvents": ["onCommand:testdriver.try"]
+          },
+          {
+            "id": "run",
+            "title": "Run your test",
+            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Run All Tests](command:testing.runAll)",
+            "media": { "markdown": "tutorial/try.md" },
+            "completionEvents": ["onCommand:testing.runAll"]
+          },
+          {
+            "id": "go",
+            "title": "Automatically generate tests",
+            "description": "TsetDriver can automatically generate tests by looking at the screen..\n[Start Walkthrough](command:testdriver.walkthroughGenerate)",
+            "media": { "markdown": "tutorial/docs.md" },
+            "completionEvents": ["onCommand:testdriver.walkthroughGenerate"]
+          }
+        ]
+      },
+      {
+        "id": "generate",
+        "title": "TestDriver Generation Walkthrough",
+        "description": "Automatically generate multiple tests by asking TestDriver to explore your app.",
+        "steps": [
+          {
+            "id": "terminal",
+            "title": "Open a Terminal",
+            "description": "Open a terminal in VS Code..\n[Open Terminal](command:workbench.action.terminal.new)",
+            "media": { "markdown": "tutorial/terminal.md" },
+            "completionEvents": ["onCommand:workbench.action.terminal.new"]
+          },
+          {
+          "id": "interactive",
+          "title": "Run TestDriver CLI",
+          "description": "Run the TestDriver cli in your terminal by typing `testdriver` and pressing enter..\n[Run TestDriver CLI](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
+          "media": { "markdown": "tutorial/web.md" },
+          "completionEvents": ["onCommand:workbench.action.terminal.sendSequence"]
+          },
+            {
+            "id": "web",
+            "title": "Run TestDriver Generate",
+            "description": "Run the TestDriver web test by typing `web 5` in the terminal. TestDriver will create new test prompts in `testdriver/generate` folder.\n[Run Explore Command](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22%2Fgenerate%20web%205%5Cn%22%7D)",
+            "media": { "markdown": "tutorial/web.md" },
+            "completionEvents": ["onCommand:workbench.action.terminal.sendSequence"]
+            },
+          {
+            "id": "run",
+            "title": "Run the generated tests",
+            "description": "TestDriver will use the prompts in the test file to complete the regression test.\n[Run All Tests](command:testing.runAll)",
+            "media": { "markdown": "tutorial/try.md" },
+            "completionEvents": ["onCommand:testing.runAll"]
+          },
+          {
+            "id": "go",
+            "title": "Deployment Walkthrough",
+            "description": "Follow the deployment walkthrough to deploy your new tests to GitHub actions!.\n[Start Walkthrough](command:testdriver.walkthroughDeploy)",
+            "media": { "markdown": "tutorial/docs.md" },
+            "completionEvents": ["onCommand:testdriver.walkthroughDeploy"]
+          }
+        ]
+      },
+      {
+        "id": "deploy",
+        "title": "TestDriver Deployment Walkthrough",
+        "description": "Learn how to run your tests within GitHub actions.",
+        "steps": [
+          {
+            "id": "branch",
+            "title": "Create a new branch",
+            "description": "Use `git checkout -b testdriver` to make a new branch.\n[Create Branch](command:git.branch)",
+            "media": { "markdown": "tutorial/branch.md" },
+            "completionEvents": ["onCommand:git.branch"]
+          },
+          {
+            "id": "stage",
+            "title": "Stage your changes",
+            "description": "Stage your changes with `git add .`.\n[Stage All Changes](command:git.stageAll)",
+            "media": { "markdown": "tutorial/try.md" },
+            "completionEvents": ["onCommand:git.stageAll"]
+          },
+            {
+            "id": "commit",
+            "title": "Commit your changes",
+            "description": "Commit your changes with `git commit -m 'your message'`.\n[Commit Changes](command:git.commit)",
+            "media": { "markdown": "tutorial/commit.md" },
+            "completionEvents": ["onCommand:git.commit"]
+            },
+          {
+            "id": "secrets",
+            "title": "Sync .env with GitHub secrets",
+            "description": "Run the `upload-secrets` command to set your API Key and Website  URL in GitHub secrets. [Run Secret Sync](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20upload-secrets%5Cn%22%7D)",
+            "media": { "markdown": "tutorial/branch.md" },
+            "completionEvents": ["onCommand:git.branch"]
+          },
+          {
+            "id": "push",
+            "title": "Push your changes",
+            "description": "Type `git push` in terminal to upload your new test files.\n[Push Changes](command:git.push)",
+            "media": { "markdown": "tutorial/push.md" },
+            "completionEvents": ["onCommand:git.push"]
+          },
+          {
+            "id": "docs",
+            "title": "Watch your test runs!",
+            "description": "Your test will now run everyday and on new pull requests.\n[Learn More](command:workbench.action.openUrl?%7B%22url%22%3A%22https%3A%2F%2Fdocs.testdriver.ai%22%7D)",
+            "media": { "markdown": "tutorial/docs.md" },
+            "completionEvents": ["onCommand:workbench.action.openUrl"]
+          }
+
+        ]
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "testdriver.driver",
+        "fullName": "TestDriver",
+        "name": "testdriver",
+        "description": "What can I test for you?",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "dry",
+            "description": "Generate TestDriver steps using a desktop screenshot",
+            "disambiguation": [
+              {
+                "category": "exec",
+                "description": "The user wants to try steps before executing them.",
+                "examples": [
+                  "open browser and navigate to airbnb.com",
+                  "fill out this form"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "try",
+            "description": "Generate TestDriver steps using a desktop screenshot",
+            "disambiguation": [
+              {
+                "category": "exec",
+                "description": "The user wants to automate a workflow in one step",
+                "examples": [
+                  "open browser and navigate to airbnb.com",
+                  "fill out this form"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "languageModelTools": [],
+    "commands": [
+      {
+        "command": "testdriver.walkthrough",
+        "title": "TestDriver: Start Setup Walkthrough"
+      },
+      {
+        "command": "testdriver.walkthroughGenerate",
+        "title": "TestDriver: Start Test Generation Walkthrough"
+      },
+      {
+        "command": "testdriver.walkthroughDeploy",
+        "title": "TestDriver: Start Deployment Walkthrough"
+      },
+      {
+        "command": "testdriver.init",
+        "title": "TestDriver: Run setup in the active workspace."
+      },
+      {
+        "command": "testdriver.dry",
+        "title": "TestDriver: Generate test steps, but don't run them."
+      },
+      {
+        "command": "testdriver.try",
+        "title": "TestDriver: Generate test steps, and run them."
+      }
+    ]
+  },
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc",
+    "format": "prettier --write .",
+    "lint": "eslint",
+    "watch": "tsc -watch"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "markdown-parser": "^0.0.8",
+    "node-ipc": "^12.0.0",
+    "ws": "^8.18.1",
+    "arktype": "^2.1.19",
+    "js-yaml": "^4.1.0",
+    "js-yaml-source-map": "^0.2.2",
+    "vscode": "^1.1.37"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@stylistic/eslint-plugin": "^2.9.0",
+    "@types/node": "^20.17.30",
+    "@types/node-ipc": "^9.2.3",
+    "@types/vscode": "^1.95.0",
+    "eslint": "^9.13.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.0",
+    "vscode": "^1.1.37",
+    "@vscode/chat-extension-utils": "^0.0.0-alpha.1",
+    "@vscode/prompt-tsx": "^0.3.0-alpha.12"
+  }
 }
