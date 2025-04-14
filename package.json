@@ -53,6 +53,27 @@
             "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:testing.runAll)",
             "media": { "markdown": "tutorial/try.md" },
             "completionEvents": ["onCommand:testing.runAll"]
+          },
+          {
+            "id": "generate",
+            "title": "Generation Guide",
+            "description": "Read the TestDriver docs to learn more about how to use it.\n[Read Docs](command:testdriver.walkthroughGenerate)",
+            "media": { "markdown": "tutorial/docs.md" },
+            "completionEvents": ["onCommand:testdriver.walkthroughGenerate"]
+          },
+          {
+            "id": "deploy",
+            "title": "Deployment Guide",
+            "description": "Read the TestDriver docs to learn more about how to use it.\n[Read Docs](command:testdriver.walkthroughDeploy)",
+            "media": { "markdown": "tutorial/docs.md" },
+            "completionEvents": ["onCommand:testdriver.walkthroughDeploy"]
+          },
+          {
+            "id": "docs",
+            "title": "Deployment Guide",
+            "description": "Read the TestDriver docs to learn more about how to use it.\n[Read Docs](command:testdriver.walkthroughDeploy)",
+            "media": { "markdown": "tutorial/docs.md" },
+            "completionEvents": ["onCommand:testdriver.walkthroughDeploy"]
           }
         ]
       },
@@ -84,10 +105,17 @@
             },
           {
             "id": "run",
-            "title": "Run your test",
-            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:testing.runAll)",
+            "title": "Generate your tests",
+            "description": "Run the tests to generate them",
             "media": { "markdown": "tutorial/try.md" },
             "completionEvents": ["onCommand:testing.runAll"]
+          },
+          {
+            "id": "go",
+            "title": "Deployment Guide",
+            "description": "Read the TestDriver docs to learn more about how to use it.\n[Read Docs](command:testdriver.walkthroughDeploy)",
+            "media": { "markdown": "tutorial/docs.md" },
+            "completionEvents": ["onCommand:testdriver.walkthroughDeploy"]
           }
         ]
       },
@@ -111,26 +139,20 @@
             "completionEvents": ["onCommand:git.stageAll"]
           },
           {
-            "id": "commit",
-            "title": "Commit your tests",
-            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:git.commit)",
-            "media": { "markdown": "tutorial/try.md" },
-            "completionEvents": ["onCommand:git.commit"]
+            "id": "secrets",
+            "title": "Sync Local Secrets",
+            "description": "Run testdriver upload-secrets\n[Run Test](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20upload-secrets%5Cn%22%7D)",
+            "media": { "markdown": "tutorial/branch.md" },
+            "completionEvents": ["onCommand:git.branch"]
           },
           {
-            "id": "push",
-            "title": "Push new tests",
-            "description": "Type `@testdriverai /try click on the menu bar` in the chat window. TestDriver will execute the commands and make a new test file.\n[Try it out](command:git.push)",
-            "media": { "markdown": "tutorial/try.md" },
-            "completionEvents": ["onCommand:git.push"]
-          },
-            {
-            "id": "deploy",
-            "title": "Deploy your app",
-            "description": "Click the link below to deploy your app.\n[Deploy Now](https://docs.testdriver.ai/guides/github-actions/github-action-setup)",
-            "media": { "markdown": "tutorial/deploy.md" },
-            "completionEvents": ["onLink:https://docs.testdriver.ai/guides/github-actions/github-action-setup"]
-            }
+            "id": "docs",
+            "title": "Finish reading docs",
+            "description": "Read the TestDriver docs to learn more about how to use it.\n[Read Docs](command:workbench.action.openUrl?%7B%22url%22%3A%22https%3A%2F%2Fdocs.testdriver.ai%22%7D)",
+            "media": { "markdown": "tutorial/docs.md" },
+            "completionEvents": ["onCommand:workbench.action.openUrl"]
+          }
+
         ]
       }
     ],
