@@ -68,10 +68,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
     this.client.config.maxRetries = MAX_RETRIES;
     this.client.config.silent = true;
 
-
     console.log(this.cwd, this.env);
 
     const terminal = vscode.window.createTerminal({
+      iconPath: 'images/icon.png',
       name: `TestDriver AI - vscode extension`,
       cwd: this.cwd,
       env: {
@@ -89,21 +89,35 @@ export class TDInstance extends EventEmitter<EventsMap> {
     }
 
     console.log('args', args);
-    console.log(args)
-
+    console.log(args);
 
     this.process = spawn(`testdriverai`, args, {
       stdio: 'pipe',
       cwd: this.cwd,
       env: {
-      ...process.env,
-      ...this.env,
-      TD_OVERLAY_ID: this.overlayId,
-      FORCE_COLOR: 'true', // Enable color rendering
+        ...process.env,
+        ...this.env,
+        TD_OVERLAY_ID: this.overlayId,
+        FORCE_COLOR: 'true', // Enable color rendering
       },
     });
 
     this.serverId = `testdriverai_${this.process.pid}`;
+
+    // log all the output to a new vscode output channel called testdriver.ai and remove ansi codes
+    const outputChannel = vscode.window.createOutputChannel(
+      'TestDriver',
+      'markdown',
+    );
+    this.process.stdout?.on('data', (data) => {
+      // const message = data.toString();
+      // const cleanMessage = message.replace(
+      //   /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g,
+      //   '',
+      // );
+    });
+    // show the output channel
+    outputChannel.show();
 
     this.on('pending', () => (this.state = 'pending'))
       .on('idle', () => (this.state = 'idle'))
@@ -157,9 +171,13 @@ export class TDInstance extends EventEmitter<EventsMap> {
             this.emit((data as boolean) ? 'idle' : 'busy');
             break;
           case 'output':
+            outputChannel.append(data);
             this.emit('output', data as string);
             break;
           case 'status':
+            outputChannel.appendLine('');
+            outputChannel.appendLine(data);
+            outputChannel.appendLine('');
             this.emit('status', data as string);
             break;
           case 'show:vm':
@@ -189,8 +207,8 @@ export class TDInstance extends EventEmitter<EventsMap> {
       .on('busy', () => console.log('[debug:busy]'))
       .on('exit', (code) => console.log('[debug:exit]', code))
       .on('stdout', (data) => process.stdout.write(data))
-      .on('stderr', (data) => process.stderr.write(data))
-      .on('output', (data) => process.stdout.write(data));
+      .on('stderr', (data) => process.stderr.write(data));
+    // .on('output', (data) => process.stdout.write(data));
   }
 
   async run(
@@ -283,9 +301,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
   }
 
   async focus() {
-
-    console.log('focus called')
-    const uri = vscode.Uri.file(path.join(this.cwd, this.file || 'testdriver.yaml'));
+    console.log('focus called');
+    const uri = vscode.Uri.file(
+      path.join(this.cwd, this.file || 'testdriver.yaml'),
+    );
     const doc = await vscode.workspace.openTextDocument(uri);
     const editor = await vscode.window.showTextDocument(doc, {
       preview: true,
@@ -302,11 +321,9 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
       editor.revealRange(
         new vscode.Range(position, position),
-        vscode.TextEditorRevealType.InCenterIfOutsideViewport
+        vscode.TextEditorRevealType.InCenterIfOutsideViewport,
       );
     }
-
-
   }
 
   destroy() {
@@ -322,7 +339,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
 let chatInstance: TDInstance | null = null;
 
 export const getChatInstance = async () => {
-
   console.log('getChatInstance', chatInstance);
 
   if (!chatInstance || chatInstance.state === 'exit') {
@@ -356,9 +372,7 @@ export const getChatInstance = async () => {
     const testdriverYaml = path.join(dir, file);
     fs.writeFileSync(testdriverYaml, '', { flag: 'w' });
 
-    chatInstance = new TDInstance(dir, { env, file});
-
-
+    chatInstance = new TDInstance(dir, { env, file });
   }
   return chatInstance;
 };
