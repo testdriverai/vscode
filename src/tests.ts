@@ -136,7 +136,7 @@ const setupRunProfiles = (controller: vscode.TestController) => {
         console.log(`Running test ${relativePath}...`);
 
         await instance
-          .run(`/run ${relativePath} --save`, {
+          .run(`/run ${relativePath}`, {
             signal: abortController.signal,
           })
           .then(() => run.passed(test))
