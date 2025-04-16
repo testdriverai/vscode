@@ -1,5 +1,4 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import dotenv from 'dotenv';
 import nodeIPC from 'node-ipc';
@@ -121,12 +120,18 @@ export class TDInstance extends EventEmitter<EventsMap> {
         this.destroy();
       });
 
-    this.process.stdout!.on('data', (data) =>
-      this.emit('stdout', data.toString()),
-    );
-    this.process.stderr!.on('data', (data) =>
-      this.emit('stderr', data.toString()),
-    );
+    import('strip-ansi').then((stripAnsi) => {
+      this.process.stdout!.on('data', (data) => {
+        const strippedData = stripAnsi.default(data.toString());
+        this.emit('stdout', strippedData);
+        outputChannel.append(strippedData);
+      });
+      this.process.stderr!.on('data', (data) => {
+        const strippedData = stripAnsi.default(data.toString());
+        this.emit('stderr', strippedData);
+        outputChannel.append(strippedData);
+      });
+    });
 
     this.process.once('error', () => {
       this.emit('exit', 1);
@@ -165,13 +170,9 @@ export class TDInstance extends EventEmitter<EventsMap> {
             this.emit((data as boolean) ? 'idle' : 'busy');
             break;
           case 'output':
-            outputChannel.append(data as string);
             this.emit('output', data as string);
             break;
           case 'status':
-            outputChannel.appendLine('');
-            outputChannel.appendLine(data as string);
-            outputChannel.appendLine('');
             this.emit('status', data as string);
             break;
           case 'show:vm':
@@ -366,7 +367,7 @@ export const getChatInstance = async () => {
     const testdriverYaml = path.join(dir, file);
     fs.writeFileSync(testdriverYaml, '', { flag: 'w' });
 
-    chatInstance = new TDInstance(dir, { env, file });
+    chatInstance = new TDInstance(dir, { env, file, focus: true });
   }
   return chatInstance;
 };
