@@ -125,12 +125,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     import('strip-ansi').then((stripAnsi) => {
       this.process.stdout!.on('data', (data) => {
-        this.emit('stdout', data);
+        this.emit('stdout', data.toString());
         const strippedData = stripAnsi.default(data.toString());
         outputChannel.append(strippedData);
       });
       this.process.stderr!.on('data', (data) => {
-        this.emit('stderr', data);
+        this.emit('stderr', data.toString());
         const strippedData = stripAnsi.default(data.toString());
         outputChannel.append(strippedData);
       });

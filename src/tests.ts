@@ -133,8 +133,6 @@ const setupRunProfiles = (controller: vscode.TestController) => {
           run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
         });
 
-        console.log(`Running test ${relativePath}...`);
-
         await instance
           .run(`/run ${relativePath}`, {
             signal: abortController.signal,
