@@ -73,7 +73,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     const terminal = vscode.window.createTerminal({
       iconPath: 'media/icon.png',
-      name: `TestDriver AI - vscode extension`,
+      name: `TestDriver`,
       cwd: this.cwd,
       env: {
         FORCE_COLOR: 'true',
@@ -87,8 +87,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     const args: string[] = [];
     if (this.file) {
-      args.push(this.file);
+      args.push(path.join('testdriver', this.file));
     }
+
+    console.log('running', `testdriverai`, args);
 
     this.process = spawn(`testdriverai`, args, {
       stdio: 'pipe',
@@ -299,7 +301,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
   async focus() {
     console.log('focus called');
     const uri = vscode.Uri.file(
-      path.join(this.cwd, this.file || 'testdriver.yaml'),
+      path.join(this.cwd, 'testdriver', this.file || 'testdriver.yaml'),
     );
     const doc = await vscode.workspace.openTextDocument(uri);
     const editor = await vscode.window.showTextDocument(doc, {
@@ -339,7 +341,9 @@ export const getChatInstance = async () => {
 
   if (!chatInstance || chatInstance.state === 'exit') {
     console.log('Creating new chat instance');
+
     const workingDir = getActiveWorkspaceFolder()?.uri.fsPath;
+
     let env: Record<string, string> = {};
     if (workingDir) {
       const envPath = path.join(workingDir, '.env');
@@ -368,7 +372,11 @@ export const getChatInstance = async () => {
     const testdriverYaml = path.join(dir, file);
     fs.writeFileSync(testdriverYaml, '', { flag: 'w' });
 
-    chatInstance = new TDInstance(dir, { env, file, focus: true });
+    chatInstance = new TDInstance(workingDir, {
+      env,
+      file,
+      focus: true,
+    });
   }
   return chatInstance;
 };

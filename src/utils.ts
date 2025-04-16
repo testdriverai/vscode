@@ -66,6 +66,8 @@ export const getActiveWorkspaceFolder = () => {
     return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
   });
 
+  console.log('Matching workspace:', matchingWorkspace);
+
   return matchingWorkspace ?? workspaces[0];
 };
 
@@ -92,7 +94,6 @@ export class MarkdownStreamParser extends EventEmitter<{
 
   // Process a single character
   processChar(char: string) {
-
     this.emit('markdown', char);
 
     // Add the character to the recent characters buffer
@@ -103,39 +104,34 @@ export class MarkdownStreamParser extends EventEmitter<{
 
     // check if the last 3 characters were ```
     if (this.recentChars.slice(-3).join('') === '```') {
-
       this.recentChars = []; // Clear the buffer
 
       this.inCodeBlock = !this.inCodeBlock;
 
       if (!this.inCodeBlock && this.codeBlockContent) {
-
         const lines = this.codeBlockContent.split('\n');
 
         this.codeBlockLang = lines[0].replaceAll('`', '').trim();
         const strippedContent = lines.slice(1, -1).join('\n');
 
         const codeBlockObj = this.codeBlockLang
-        ? { type: this.codeBlockLang, content: strippedContent }
-        : { content: strippedContent };
+          ? { type: this.codeBlockLang, content: strippedContent }
+          : { content: strippedContent };
 
         this.emit('codeblock', codeBlockObj);
         this.codeBlockContent = '';
         this.codeBlockLang = '';
       }
-
     }
 
     if (this.inCodeBlock) {
       this.codeBlockContent += char;
       this.codeBlockLang = '';
     }
-
   }
 
   // Call this when the stream ends to emit any remaining content
   end() {
-
     // Reset state
     this.inCodeBlock = false;
     this.codeBlockContent = '';
