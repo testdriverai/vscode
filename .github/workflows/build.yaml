@@ -49,6 +49,8 @@ jobs:
         with:
           name: vscode-extension
           path: ${{ steps.get_vsix.outputs.vsix_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         id: create_release
