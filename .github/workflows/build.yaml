@@ -27,11 +27,15 @@ jobs:
       - name: Build .vsix package
         run: npm run build
 
-      - name: Find .vsix file
+      - name: Set .vsix file path
         id: get_vsix
         run: |
-          VSIX_PATH=$(find . -name "*.vsix" | head -n 1)
-          echo "Found VSIX at $VSIX_PATH"
+          VERSION=$(jq -r '.version' package.json)
+          VSIX_PATH="./testdriver-${VERSION}.vsix"
+          if [ ! -f "$VSIX_PATH" ]; then
+            echo "VSIX file not found at $VSIX_PATH"
+            exit 1
+          fi
           echo "vsix_path=$VSIX_PATH" >> $GITHUB_OUTPUT
 
       - name: Extract version from package.json
@@ -62,5 +66,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ steps.get_vsix.outputs.vsix_path }}
-          asset_name: vscode-extension.vsix
+          asset_name: testdriver-version.vsix
           asset_content_type: application/octet-stream
