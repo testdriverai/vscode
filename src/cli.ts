@@ -76,6 +76,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
       name: `TestDriver AI - vscode extension`,
       cwd: this.cwd,
       env: {
+        FORCE_COLOR: 'true',
         ...this.env,
       },
     });
@@ -122,13 +123,13 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     import('strip-ansi').then((stripAnsi) => {
       this.process.stdout!.on('data', (data) => {
+        this.emit('stdout', data);
         const strippedData = stripAnsi.default(data.toString());
-        this.emit('stdout', strippedData);
         outputChannel.append(strippedData);
       });
       this.process.stderr!.on('data', (data) => {
+        this.emit('stderr', data);
         const strippedData = stripAnsi.default(data.toString());
-        this.emit('stderr', strippedData);
         outputChannel.append(strippedData);
       });
     });
