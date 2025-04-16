@@ -372,7 +372,7 @@ export const getChatInstance = async () => {
     const testdriverYaml = path.join(dir, file);
     fs.writeFileSync(testdriverYaml, '', { flag: 'w' });
 
-    chatInstance = new TDInstance(workingDir, {
+    chatInstance = new TDInstance(workingDir ?? '', {
       env,
       file,
       focus: true,
