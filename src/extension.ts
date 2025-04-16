@@ -5,6 +5,20 @@ import { setupTests } from './tests';
 export function deactivate() {}
 
 export async function activate(context: vscode.ExtensionContext) {
+  const isFirstInstall = context.globalState.get(
+    'testdriver.firstInstall2',
+    true,
+  );
+
+  if (isFirstInstall) {
+    vscode.commands.executeCommand(
+      'workbench.action.openWalkthrough',
+      'testdriverai.testdriver#gettingStarted',
+      false,
+    );
+    // context.globalState.update('testdriver.firstInstall2', false);
+  }
+
   registerCommands();
   registerChatParticipant(context);
   const controller = setupTests();

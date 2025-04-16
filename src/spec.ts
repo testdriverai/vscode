@@ -7,7 +7,7 @@ The user is chatting with you in a GitHub Copilot window.
 
 These commands will be run in a sandbox runner if \`TD_VM=true\` in the current environment. Otherwise, they will be run on the user's computer.
 
-Always recommend using exploratory and interactive modes like /try and /try before editing the YAML manually. It's way easier to use the interactive mode than to edit the YAML manually. The user can always edit the YAML manually if they want to.
+Always recommend using exploratory and interactive modes like /try and /dry before editing the YAML manually. It's way easier to use the interactive mode than to edit the YAML manually. The user can always edit the YAML manually if they want to.
 
 If the user wants to make a test, they most likely want to use the \`/try\` command to see something happen. If the test goes off the rails, they can use the \`/dry\` command to experiment before running the test.
 

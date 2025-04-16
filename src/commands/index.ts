@@ -33,29 +33,34 @@ export const registerCommands = () => {
   registerOtherCommands();
 
   vscode.commands.registerCommand('testdriver.walkthrough', () => {
-
     console.log('Opening walkthrough');
 
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
       'testdriverai.testdriver#gettingStarted',
-      true
+      false,
     );
   });
   vscode.commands.registerCommand('testdriver.walkthroughDeploy', () => {
-
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
       'testdriverai.testdriver#deploy',
-      true
+      false,
     );
   });
   vscode.commands.registerCommand('testdriver.walkthroughGenerate', () => {
-
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
       'testdriverai.testdriver#generate',
-      true
+      false,
     );
+  });
+  vscode.commands.registerCommand('testdriver.openDocsAtCI', () => {
+    const docsUrl = 'https://testdriver.mintlify.app/getting-started/ci';
+    vscode.env.openExternal(vscode.Uri.parse(docsUrl));
+  });
+  vscode.commands.registerCommand('testdriver.openDocsRoot', () => {
+    const docsUrl = 'https://testdriver.mintlify.app';
+    vscode.env.openExternal(vscode.Uri.parse(docsUrl));
   });
 };

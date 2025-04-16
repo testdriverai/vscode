@@ -11,7 +11,9 @@ export function registerChatParticipant(context: vscode.ExtensionContext) {
     PARTICIPANT_ID,
     handler,
   );
-  participant.iconPath = vscode.Uri.file(path.join(context.extensionUri.fsPath, 'icon.png'));
+  participant.iconPath = vscode.Uri.file(
+    path.join(context.extensionUri.fsPath, 'icon.png'),
+  );
 }
 
 const handler: vscode.ChatRequestHandler = async (
@@ -23,7 +25,6 @@ const handler: vscode.ChatRequestHandler = async (
   if (request.command) {
     const commands = ['dry', 'try'];
     if (commands.includes(request.command)) {
-
       const workspace = getActiveWorkspaceFolder();
       if (!workspace) {
         stream.progress('No workspace found');
@@ -36,7 +37,10 @@ const handler: vscode.ChatRequestHandler = async (
       const instance = (await getChatInstance()) as unknown as {
         on: (event: 'status', handler: (status: string) => void) => void;
         focus: () => void;
-        run: (command: string, options: { signal: AbortSignal; callback: (event: any) => void }) => Promise<void>;
+        run: (
+          command: string,
+          options: { signal: AbortSignal; callback: (event: any) => void },
+        ) => Promise<void>;
       };
 
       instance.focus();
@@ -49,7 +53,6 @@ const handler: vscode.ChatRequestHandler = async (
       await instance.run(`/${request.command} ${request.prompt}`, {
         signal: abortController.signal,
         callback: (event) => {
-
           if (typeof event === 'string') {
             stream.markdown(event);
           } else {

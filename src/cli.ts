@@ -46,9 +46,11 @@ export class TDInstance extends EventEmitter<EventsMap> {
     {
       file,
       env,
+      focus = false,
     }: {
       file?: string;
       env?: Record<string, string>;
+      focus?: boolean;
     } = {},
   ) {
     super();
@@ -88,9 +90,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
       args.push(this.file);
     }
 
-    console.log('args', args);
-    console.log(args);
-
     this.process = spawn(`testdriverai`, args, {
       stdio: 'pipe',
       cwd: this.cwd,
@@ -109,15 +108,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
       'TestDriver',
       'markdown',
     );
-    this.process.stdout?.on('data', (data) => {
-      // const message = data.toString();
-      // const cleanMessage = message.replace(
-      //   /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g,
-      //   '',
-      // );
-    });
-    // show the output channel
-    outputChannel.show();
+
+    if (focus) {
+      outputChannel.show();
+    }
 
     this.on('pending', () => (this.state = 'pending'))
       .on('idle', () => (this.state = 'idle'))
@@ -171,12 +165,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
             this.emit((data as boolean) ? 'idle' : 'busy');
             break;
           case 'output':
-            outputChannel.append(data);
+            outputChannel.append(data as string);
             this.emit('output', data as string);
             break;
           case 'status':
             outputChannel.appendLine('');
-            outputChannel.appendLine(data);
+            outputChannel.appendLine(data as string);
             outputChannel.appendLine('');
             this.emit('status', data as string);
             break;
