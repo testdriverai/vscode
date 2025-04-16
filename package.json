@@ -3,12 +3,12 @@
   "publisher": "testdriverai",
   "displayName": "TestDriver",
   "description": "AI QA Agents",
-  "icon": "images/icon.png",
+  "icon": "media/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/Microsoft/vscode-extension-samples"
   },
-  "version": "0.1.2",
+  "version": "0.1.3",
   "engines": {
     "vscode": "^1.95.0"
   },

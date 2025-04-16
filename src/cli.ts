@@ -73,7 +73,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
     console.log(this.cwd, this.env);
 
     const terminal = vscode.window.createTerminal({
-      iconPath: 'images/icon.png',
+      iconPath: 'media/icon.png',
       name: `TestDriver AI - vscode extension`,
       cwd: this.cwd,
       env: {
