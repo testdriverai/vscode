@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/Microsoft/vscode-extension-samples"
   },
-  "version": "0.1.9",
+  "version": "0.1.10",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -39,7 +39,7 @@
             "title": "Set up TestDriver",
             "description": "Install & configure TestDriver in the active workspace.\n[Run Setup](command:testdriver.init)",
             "media": {
-              "image": "images/main.png",
+              "image": "media/main.png",
               "altText": "TestDriver Mock"
             },
             "completionEvents": [
@@ -62,7 +62,7 @@
             "title": "Run your test",
             "description": "Run your generated test in the Test Explorer panel.\n[Run All Tests](command:testing.runAll)",
             "media": {
-              "image": "images/run.png",
+              "image": "media/run.png",
               "altText": "TestDriver Mock"
             },
             "completionEvents": [
@@ -74,7 +74,7 @@
             "title": "Try \"self-driving\" mode",
             "description": "TestDriver can automatically generate tests by looking at the screen.\n[Start Walkthrough](command:testdriver.walkthroughGenerate)",
             "media": {
-              "image": "images/change.png",
+              "image": "media/change.png",
               "altText": "TestDriver Mock"
             },
             "completionEvents": [
@@ -86,7 +86,7 @@
             "title": "Deploy your tests",
             "description": "Follow the deployment walkthrough to deploy your new tests to GitHub actions!.\n[Start Walkthrough](command:testdriver.walkthroughDeploy)",
             "media": {
-              "image": "images/github.png",
+              "image": "media/github.png",
               "altText": "TestDriver Mock"
             },
             "completionEvents": [
@@ -105,7 +105,7 @@
             "title": "Open a Terminal",
             "description": "Open a terminal window to use the TestDriver CLI\n[Open Terminal](command:workbench.action.terminal.new)",
             "media": {
-              "image": "images/change.png",
+              "image": "media/change.png",
               "altText": "TestDriver Change"
             },
             "completionEvents": [
@@ -117,7 +117,7 @@
             "title": "Run TestDriver CLI",
             "description": "Run the TestDriver cli in your terminal by typing `testdriverai` and pressing enter..\n[Run TestDriver CLI](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
             "media": {
-              "image": "images/change.png",
+              "image": "media/change.png",
               "altText": "TestDriver Change"
             },
             "completionEvents": [
@@ -129,7 +129,7 @@
             "title": "Run TestDriver Generate",
             "description": "Run the TestDriver web test by typing `/generate web 5` in the terminal. TestDriver will create new test prompts in `testdriver/generate` folder.\n[Run /generate Command](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22%2Fgenerate%20web%205%5Cn%22%7D)",
             "media": {
-              "image": "images/change.png",
+              "image": "media/change.png",
               "altText": "TestDriver Change"
             },
             "completionEvents": [
@@ -141,7 +141,7 @@
             "title": "Run the generated tests",
             "description": "TestDriver will use the prompts in the test file to complete the regression test.\n[Run All Tests](command:testing.runAll)",
             "media": {
-              "image": "images/change.png",
+              "image": "media/change.png",
               "altText": "TestDriver Change"
             },
             "completionEvents": [
@@ -153,7 +153,7 @@
             "title": "Deploy your tests!",
             "description": "Follow the deployment walkthrough to deploy your new tests to GitHub actions!.\n[Start Walkthrough](command:testdriver.walkthroughDeploy)",
             "media": {
-              "image": "images/change.png",
+              "image": "media/change.png",
               "altText": "TestDriver Change"
             },
             "completionEvents": [
@@ -172,7 +172,7 @@
             "title": "Create a new branch",
             "description": "Use `git checkout -b testdriver` to make a new branch.\n[Create Branch](command:git.branch)",
             "media": {
-              "image": "images/github.png",
+              "image": "media/github.png",
               "altText": "TestDriver GitHub"
             },
             "completionEvents": [
@@ -184,7 +184,7 @@
             "title": "Stage your changes",
             "description": "Stage your changes with `git add .`.\n[Stage All Changes](command:git.stageAll)",
             "media": {
-              "image": "images/github.png",
+              "image": "media/github.png",
               "altText": "TestDriver GitHub"
             },
             "completionEvents": [
@@ -196,7 +196,7 @@
             "title": "Commit your changes",
             "description": "Commit your changes with `git commit -m 'your message'`.\n[Commit Changes](command:git.commit)",
             "media": {
-              "image": "images/github.png",
+              "image": "media/github.png",
               "altText": "TestDriver GitHub"
             },
             "completionEvents": [
@@ -208,7 +208,7 @@
             "title": "Sync .env with GitHub secrets",
             "description": "Run the `upload-secrets` command to set your API Key and Website  URL in GitHub secrets.\n[Run Secret Sync](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20upload-secrets%5Cn%22%7D)",
             "media": {
-              "image": "images/github.png",
+              "image": "media/github.png",
               "altText": "TestDriver GitHub"
             },
             "completionEvents": [
@@ -220,7 +220,7 @@
             "title": "Push your changes",
             "description": "Type `git push` in terminal to upload your new test files.\n[Push Changes](command:git.push)",
             "media": {
-              "image": "images/github.png",
+              "image": "media/github.png",
               "altText": "TestDriver GitHub"
             },
             "completionEvents": [
@@ -232,7 +232,7 @@
             "title": "Watch your test runs!",
             "description": "Your test will now run everyday and on new pull requests.\n[Learn More](command:testdriver.openDocsAtCI)",
             "media": {
-              "image": "images/github.png",
+              "image": "media/github.png",
               "altText": "TestDriver GitHub"
             },
             "completionEvents": [

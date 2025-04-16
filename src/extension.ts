@@ -6,7 +6,7 @@ export function deactivate() {}
 
 export async function activate(context: vscode.ExtensionContext) {
   const isFirstInstall = context.globalState.get(
-    'testdriver.firstInstall2',
+    'testdriver.firstInstall3',
     true,
   );
 
