@@ -37,7 +37,7 @@
           {
             "id": "init",
             "title": "Set up TestDriver",
-            "description": "Install & configure TestDriver in the active workspace.\n[Run Setup](command:testdriver.init)",
+            "description": "Configure TestDriver in the active workspace.\n[Run Setup](command:testdriver.init)",
             "media": {
               "image": "media/main.png",
               "altText": "TestDriver Mock"
@@ -114,8 +114,20 @@
           },
           {
             "id": "interactive",
+            "title": "Install `testdriverai` globally",
+            "description": "Install the TestDriver CLI globally .\n[npm install testdriverai -g](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22npm%20install%20testdriverai%40beta%20-g%20%5Cn%22%7D)",
+            "media": {
+              "image": "media/change.png",
+              "altText": "TestDriver Change"
+            },
+            "completionEvents": [
+              "onCommand:workbench.action.terminal.sendSequence"
+            ]
+          },
+          {
+            "id": "interactive",
             "title": "Run TestDriver CLI",
-            "description": "Run the TestDriver cli in your terminal by typing `testdriverai` and pressing enter..\n[Run TestDriver CLI](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
+            "description": "Run the TestDriver CLI in your terminal by typing `testdriverai` and pressing enter.\n[Run TestDriver CLI](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
             "media": {
               "image": "media/change.png",
               "altText": "TestDriver Change"
@@ -323,13 +335,14 @@
     "build": "tsc && vsce package"
   },
   "dependencies": {
+    "arktype": "^2.1.19",
     "dotenv": "^16.5.0",
+    "js-yaml": "^4.1.0",
+    "js-yaml-source-map": "^0.2.2",
     "markdown-parser": "^0.0.8",
     "node-ipc": "^12.0.0",
-    "ws": "^8.18.1",
-    "arktype": "^2.1.19",
-    "js-yaml": "^4.1.0",
-    "js-yaml-source-map": "^0.2.2"
+    "testdriverai": "^5.3.13",
+    "ws": "^8.18.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
@@ -337,12 +350,12 @@
     "@types/node": "^20.17.30",
     "@types/node-ipc": "^9.2.3",
     "@types/vscode": "^1.95.0",
+    "@vscode/chat-extension-utils": "^0.0.0-alpha.1",
+    "@vscode/prompt-tsx": "^0.3.0-alpha.12",
     "eslint": "^9.13.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.26.0",
-    "vscode": "^1.1.37",
-    "@vscode/chat-extension-utils": "^0.0.0-alpha.1",
-    "@vscode/prompt-tsx": "^0.3.0-alpha.12"
+    "vscode": "^1.1.37"
   }
 }
