@@ -80,10 +80,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
         ...this.env,
       },
     });
-    terminal.sendText(
-      `testdriverai --renderer ${this.overlayId} && exit`,
-      true,
-    );
+
+    const command = process.platform === 'win32'
+      ? `powershell -Command "testdriverai --renderer ${this.overlayId}; exit"`
+      : `testdriverai --renderer ${this.overlayId} && exit`;
+
+    terminal.sendText(command, true);
 
     const args: string[] = [];
     if (this.file) {
