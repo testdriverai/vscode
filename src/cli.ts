@@ -81,9 +81,11 @@ export class TDInstance extends EventEmitter<EventsMap> {
       },
     });
 
+    const pathToBinary = require.resolve('testdriverai');
+
     const command = process.platform === 'win32'
-      ? `powershell -Command "testdriverai --renderer ${this.overlayId}; exit"`
-      : `testdriverai --renderer ${this.overlayId} && exit`;
+      ? `powershell -Command "node ${pathToBinary} --renderer ${this.overlayId}; exit"`
+      : `node ${pathToBinary} --renderer ${this.overlayId} && exit`;
 
     terminal.sendText(command, true);
 
@@ -92,16 +94,14 @@ export class TDInstance extends EventEmitter<EventsMap> {
       args.push(path.join('testdriver', this.file));
     }
 
-    console.log('running', `testdriverai`, args);
-
-    this.process = spawn(`testdriverai`, args, {
+    this.process = spawn('node', [pathToBinary, ...args], {
       stdio: 'pipe',
       cwd: this.cwd,
       env: {
-        ...process.env,
-        ...this.env,
-        TD_OVERLAY_ID: this.overlayId,
-        FORCE_COLOR: 'true', // Enable color rendering
+      ...process.env,
+      ...this.env,
+      TD_OVERLAY_ID: this.overlayId,
+      FORCE_COLOR: 'true', // Enable color rendering
       },
     });
 
@@ -138,11 +138,15 @@ export class TDInstance extends EventEmitter<EventsMap> {
       });
     });
 
-    this.process.once('error', () => {
+    this.process.on('error', (e) => {
+      outputChannel.append(e.toString());
+      this.emit('stderr', e.message);
       this.emit('exit', 1);
     });
 
-    this.process.once('exit', (code) => {
+    this.process.on('exit', (code) => {
+      outputChannel.append('Exiting with code ' + code);
+      this.emit('stderr', 'Exiting with code ' + code);
       this.emit('exit', code);
     });
 
