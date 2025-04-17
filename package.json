@@ -114,8 +114,20 @@
           },
           {
             "id": "interactive",
+            "title": "Install `testdriverai` globally",
+            "description": "Install the TestDriver CLI globally .\n[npm install testdriverai -g](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22npm%20install%20testdriverai%40beta%20-g%20%5Cn%22%7D)",
+            "media": {
+              "image": "media/change.png",
+              "altText": "TestDriver Change"
+            },
+            "completionEvents": [
+              "onCommand:workbench.action.terminal.sendSequence"
+            ]
+          },
+          {
+            "id": "interactive",
             "title": "Run TestDriver CLI",
-            "description": "Run the TestDriver cli in your terminal by typing `testdriverai` and pressing enter..\n[Run TestDriver CLI](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
+            "description": "Run the TestDriver CLI in your terminal by typing `testdriverai` and pressing enter.\n[Run TestDriver CLI](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
             "media": {
               "image": "media/change.png",
               "altText": "TestDriver Change"
