@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/Microsoft/vscode-extension-samples"
   },
-  "version": "0.1.14",
+  "version": "0.1.18",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -35,9 +35,21 @@
         "description": "Test your app with a computer-use agent in just a few minutes.",
         "steps": [
           {
+            "id": "install",
+            "title": "Install TestDriver",
+            "description": "Install TestDriver via NPM.\n[npm install testdriverai -g](command:testdriver.install)",
+            "media": {
+              "image": "media/main.png",
+              "altText": "TestDriver Mock"
+            },
+            "completionEvents": [
+              "onCommand:testdriver.install"
+            ]
+          },
+          {
             "id": "init",
-            "title": "Set up TestDriver",
-            "description": "Install & configure TestDriver in the active workspace.\n[Run Setup](command:testdriver.init)",
+            "title": "Set up TestDriver workspace",
+            "description": "Run TestDriver Project Setup. Complete the setup wizard.\n[testdriverai init](command:testdriver.init)",
             "media": {
               "image": "media/main.png",
               "altText": "TestDriver Mock"
@@ -115,7 +127,7 @@
           {
             "id": "interactive",
             "title": "Run TestDriver CLI",
-            "description": "Run the TestDriver cli in your terminal by typing `testdriverai` and pressing enter..\n[Run TestDriver CLI](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
+            "description": "Run the TestDriver cli in your terminal by typing `testdriverai` and pressing enter.\n[Run TestDriver CLI](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
             "media": {
               "image": "media/change.png",
               "altText": "TestDriver Change"
@@ -298,6 +310,10 @@
       {
         "command": "testdriver.init",
         "title": "TestDriver: Run setup in the active workspace."
+      },
+      {
+        "command": "testdriver.install",
+        "title": "TestDriver: Install TestDriver via NPM"
       },
       {
         "command": "testdriver.dry",

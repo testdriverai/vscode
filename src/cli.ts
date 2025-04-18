@@ -11,6 +11,8 @@ import {
   getActiveWorkspaceFolder,
 } from './utils';
 
+import { getExecutablePath, getPackageJsonVersion, compareVersions } from './npm';
+
 type InferType<T> = T extends new () => infer U ? U : undefined;
 type IPCType = InferType<typeof nodeIPC.IPC>;
 const { IPC } = nodeIPC;
@@ -59,6 +61,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
     if (env) {
       this.env = env;
     }
+
+
+    const requiredVersion = '5.3.14';
+
     this.id = `testdriverai_vscode_${process.pid}`;
     this.state = 'pending';
 
@@ -81,9 +87,34 @@ export class TDInstance extends EventEmitter<EventsMap> {
       },
     });
 
+    let testdriverPath;
+    try {
+      testdriverPath = getExecutablePath();
+    } catch(err) {
+      // display error to user
+      vscode.window.showErrorMessage(
+        '`testdriverai` executable not found in PATH. Install `testdriverai` globally using `npm install -g testdriverai@beta`',
+      );
+      throw new Error('`testdriverai` not found in PATH. Install `testdriverai` globally using `npm install -g testdriverai@beta`');
+    }
+
+    const testdriverVersion = getPackageJsonVersion();
+
+
+    if (compareVersions(testdriverVersion, requiredVersion) <= 0) {
+      const message = `testdriverai version must be greater than ${requiredVersion}. Current version: ${testdriverVersion}`;
+      console.error('Error: testdriverai version is too old. Please update to the latest version.');
+      vscode.window.showErrorMessage(message);
+      throw new Error(message);
+    }
+
+    if (testdriverVersion) {
+      console.log(`Using testdriverai version: ${testdriverVersion}`);
+    }
+
     const command = process.platform === 'win32'
-      ? `powershell -Command "testdriverai --renderer ${this.overlayId}; exit"`
-      : `testdriverai --renderer ${this.overlayId} && exit`;
+      ? `powershell -Command "${testdriverPath} --renderer ${this.overlayId}; exit"`
+      : `${testdriverPath} --renderer ${this.overlayId} && exit`;
 
     terminal.sendText(command, true);
 
@@ -92,9 +123,9 @@ export class TDInstance extends EventEmitter<EventsMap> {
       args.push(path.join('testdriver', this.file));
     }
 
-    console.log('running', `testdriverai`, args);
+    console.log('running', testdriverPath, args);
 
-    this.process = spawn(`testdriverai`, args, {
+    this.process = spawn(testdriverPath, args, {
       stdio: 'pipe',
       cwd: this.cwd,
       env: {

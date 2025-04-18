@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { initialize } from './initialize';
+import { install } from './install';
 import { testdriverCommand } from './chat';
 import { getChatInstance } from '../cli';
 
@@ -14,6 +15,8 @@ const registerCtrlPCommands = () => {
   }
 
   vscode.commands.registerCommand('testdriver.init', initialize);
+  vscode.commands.registerCommand('testdriver.install', install);
+
 };
 
 const registerOtherCommands = () => {
