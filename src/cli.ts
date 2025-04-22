@@ -177,8 +177,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
       this.emit('exit', code);
     });
 
-    this.process.once('spawn', () => {
+    this.process.once('spawn', async () => {
       let retryCount = 0;
+
+      // Sleep to wait for IPC server to start
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       this.client.connectTo(this.serverId);
 
       const onConnect = () => {
