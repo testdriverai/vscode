@@ -46,7 +46,6 @@ const handler: vscode.ChatRequestHandler = async (
       instance.focus();
 
       instance.on('status', (status: string) => {
-        console.log('status', status);
         stream.progress(status);
       });
 
@@ -72,7 +71,6 @@ const handler: vscode.ChatRequestHandler = async (
     return;
   } else {
     stream.progress('thinking...');
-    console.log(context.history);
 
     try {
       const messages = [vscode.LanguageModelChatMessage.User(spec)];
@@ -101,11 +99,9 @@ const handler: vscode.ChatRequestHandler = async (
       const parser = new MarkdownStreamParser();
       parser
         .on('markdown', (event) => {
-          console.log('markdown', event);
           stream.markdown(event);
         })
         .on('codeblock', (event) => {
-          console.log('codeblock', event);
           if (['yaml', 'yml'].includes(event.type?.toLowerCase() ?? '')) {
             stream.button({
               command: 'testdriver.codeblock.run',

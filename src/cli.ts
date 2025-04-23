@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import nodeIPC from 'node-ipc';
 import * as vscode from 'vscode';
 import EventEmitter from 'node:events';
-import { ChildProcess, spawn } from 'node:child_process';
+import { ChildProcess, fork } from 'node:child_process';
 import {
   MarkdownParserEvent,
   MarkdownStreamParser,
@@ -37,7 +37,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
   state: 'pending' | 'idle' | 'busy' | 'exit';
   private client: IPCType;
   private process: ChildProcess;
-  private serverId: string;
   private overlayId?: string;
   private cleanup?: () => void;
   private isLocked = false;
@@ -62,20 +61,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
       this.env = env;
     }
 
-
     const requiredVersion = '5.3.14';
 
     this.id = `testdriverai_vscode_${process.pid}`;
     this.state = 'pending';
 
     this.overlayId = crypto.randomUUID();
-    this.client = new IPC();
-    this.client.config.id = this.id;
-    this.client.config.retry = 50;
-    this.client.config.maxRetries = MAX_RETRIES;
-    this.client.config.silent = true;
-
-    console.log(this.cwd, this.env);
 
     const terminal = vscode.window.createTerminal({
       iconPath: 'media/icon.png',
@@ -100,7 +91,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     const testdriverVersion = getPackageJsonVersion();
 
-
     if (compareVersions(testdriverVersion, requiredVersion) <= 0) {
       const message = `testdriverai version must be greater than ${requiredVersion}. Current version: ${testdriverVersion}`;
       console.error('Error: testdriverai version is too old. Please update to the latest version.');
@@ -123,17 +113,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
       args.push(path.join('testdriver', this.file));
     }
 
-    console.log('running', testdriverPath, args);
-
-    this.serverId = `testdriverai_${crypto.randomUUID()}`;
-
-    this.process = spawn(testdriverPath, args, {
-      stdio: 'pipe',
+    this.process = fork(testdriverPath, args, {
       cwd: this.cwd,
+      stdio: 'pipe',
       env: {
         ...process.env,
         ...this.env,
-        TD_IPC_ID: this.serverId,
         TD_OVERLAY_ID: this.overlayId,
         FORCE_COLOR: 'true', // Enable color rendering
       },
@@ -149,28 +134,23 @@ export class TDInstance extends EventEmitter<EventsMap> {
       outputChannel.show();
     }
 
-    this.on('pending', () => (this.state = 'pending'))
-      .on('idle', () => (this.state = 'idle'))
-      .on('busy', () => (this.state = 'busy'))
-      .on('exit', () => {
-        this.state = 'exit';
-        this.destroy();
-      });
-
     import('strip-ansi').then((stripAnsi) => {
-      this.process.stdout!.on('data', (data) => {
+
+
+      this.process.stdout.on('data', (data) => {
         this.emit('stdout', data.toString());
         const strippedData = stripAnsi.default(data.toString());
         outputChannel.append(strippedData);
       });
-      this.process.stderr!.on('data', (data) => {
+      this.process.stderr.on('data', (data) => {
         this.emit('stderr', data.toString());
         const strippedData = stripAnsi.default(data.toString());
         outputChannel.append(strippedData);
       });
     });
 
-    this.process.once('error', () => {
+    this.process.once('error', (e) => {
+      console.error('Error starting process', e);
       this.emit('exit', 1);
     });
 
@@ -180,7 +160,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     this.process.once('spawn', () => {
       let retryCount = 0;
-      this.client.connectTo(this.serverId);
 
       const onConnect = () => {
         retryCount = 0;
@@ -195,37 +174,64 @@ export class TDInstance extends EventEmitter<EventsMap> {
       };
 
       const onDisconnect = () => {
+
         if (this.state !== 'pending') {
           this.emit('exit', null);
         }
       };
 
-      const handleMessage = (message: { event: string; data: unknown }) => {
-        const { event, data } = message;
-        switch (event) {
+      const handleMessage = (message) => {
+
+        let d;
+        try {
+          d = message;
+        } catch (e) {
+          console.error('Error parsing message', e);
+          return;
+        }
+
+        switch (d.event) {
           case 'interactive':
-            this.emit((data as boolean) ? 'idle' : 'busy');
+            this.state = (d.data as boolean) ? 'idle' : 'busy';
+            this.emit((d.data as boolean) ? 'idle' : 'busy');
             break;
           case 'output':
-            this.emit('output', data as string);
             break;
           case 'status':
-            this.emit('status', data as string);
+            this.emit('status', d.data as string);
             break;
           case 'show:vm':
-            this.emit('vm_url', data as string);
+            this.emit('vm_url', d.data as string);
             break;
+          case 'pending':
+            this.state = 'pending';
+            this.emit('pending');
+            break;
+          case 'idle':
+            this.state = 'idle';
+            this.emit('idle');
+            break;
+          case 'busy':
+            this.state = 'busy';
+            this.emit('busy');
+            break;
+          case 'exit':
+            this.state = 'exit';
+            this.emit('exit', d.data as number);
+            this.destroy();
+            break;
+
         }
       };
 
-      this.client.of[this.serverId]
+      this.process
         .on('connect', onConnect)
         .on('error', onError)
         .on('disconnect', onDisconnect)
         .on('message', handleMessage);
 
       this.cleanup = () => {
-        this.client.of[this.serverId]
+        this.process
           ?.off('connect', onConnect)
           ?.off('error', onError)
           ?.off('disconnect', onDisconnect)
@@ -253,8 +259,8 @@ export class TDInstance extends EventEmitter<EventsMap> {
     const signal = options.signal ?? new AbortController().signal;
     do {
       await new Promise((resolve, reject) => {
+
         this.once('idle', () => {
-          console.log('cli is available');
           resolve(true);
         });
         this.once('exit', () => reject(new Error('Process exited')));
@@ -315,10 +321,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
           });
         });
 
-        this.client.of[this.serverId].emit('message', {
+        this.process.send(JSON.stringify({
           event: 'input',
           data: command,
-        });
+        }));
       },
     )
       .then((result) => {
@@ -333,7 +339,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
   }
 
   async focus() {
-    console.log('focus called');
     const uri = vscode.Uri.file(
       path.join(this.cwd, 'testdriver', this.file || 'testdriver.yaml'),
     );
@@ -371,10 +376,8 @@ export class TDInstance extends EventEmitter<EventsMap> {
 let chatInstance: TDInstance | null = null;
 
 export const getChatInstance = async () => {
-  console.log('getChatInstance', chatInstance);
 
   if (!chatInstance || chatInstance.state === 'exit') {
-    console.log('Creating new chat instance');
 
     const workingDir = getActiveWorkspaceFolder()?.uri.fsPath;
 
@@ -389,8 +392,6 @@ export const getChatInstance = async () => {
       }
     }
     const dir = path.join(workingDir ?? '', 'testdriver');
-
-    console.log('workspace testdriver dir', dir);
 
     // make a testdriver folder inside
     // the workspace directory if it doesn't exist

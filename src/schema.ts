@@ -8,7 +8,6 @@ const findNodeByPath = (doc: Document.Parsed, path: string): any => {
 
   const parts = path.split('/').slice(1); // Remove leading slash
   const node = doc.getIn(parts, true);   // Get original YAML node, not JSON-converted
-  console.log(doc, doc.getIn(parts, true), path);
   return node?.cstNode || node?.key?.cstNode || null;
 };
 
@@ -36,9 +35,6 @@ export function validate(context: vscode.ExtensionContext) {
         for (const error of ajv.errors) {
           const cstNode = findNodeByPath(doc, error.instancePath || '');
           const range = cstNode?.rangeAsLinePos;
-
-          console.log(error);
-          console.log(cstNode);
 
           if (range) {
             const startPos = new vscode.Position(range.start.line, range.start.col);
