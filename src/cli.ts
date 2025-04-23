@@ -125,18 +125,19 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     console.log('running', testdriverPath, args);
 
+    this.serverId = `testdriverai_${crypto.randomUUID()}`;
+
     this.process = spawn(testdriverPath, args, {
       stdio: 'pipe',
       cwd: this.cwd,
       env: {
         ...process.env,
         ...this.env,
+        TD_IPC_ID: this.serverId,
         TD_OVERLAY_ID: this.overlayId,
         FORCE_COLOR: 'true', // Enable color rendering
       },
     });
-
-    this.serverId = `testdriverai_${this.process.pid}`;
 
     // log all the output to a new vscode output channel called testdriver.ai and remove ansi codes
     const outputChannel = vscode.window.createOutputChannel(
