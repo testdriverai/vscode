@@ -5,7 +5,7 @@ export const initialize = async () => {
 
   console.log('Initializing TestDriver...');
 
-  const requiredVersion = '5.3.15';
+  const requiredVersion = '5.5.0';
 
   let testdriverPath;
   try {
