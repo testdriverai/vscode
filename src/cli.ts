@@ -11,7 +11,7 @@ import {
   getActiveWorkspaceFolder,
 } from './utils';
 
-import { getExecutablePath, getPackageJsonVersion, compareVersions } from './npm';
+import { getExecutablePath, getPackageJsonVersion, compareVersions, getJSPath } from './npm';
 
 type InferType<T> = T extends new () => infer U ? U : undefined;
 type IPCType = InferType<typeof nodeIPC.IPC>;
@@ -102,10 +102,16 @@ export class TDInstance extends EventEmitter<EventsMap> {
       console.log(`Using testdriverai version: ${testdriverVersion}`);
     }
 
-    const command = process.platform === 'win32'
-      ? `powershell -Command "${testdriverPath} --renderer ${this.overlayId}; exit"`
-      : `${testdriverPath} --renderer ${this.overlayId} && exit`;
+    const isWin = process.platform === 'win32';
+    const rendererId = this.overlayId;
+    const quotedPath = `"${testdriverPath}"`;
 
+    const command = isWin
+      ? `powershell -NoProfile -Command "& '${quotedPath}' --renderer ${rendererId}"`
+      : `${quotedPath} --renderer ${rendererId}`;
+
+
+    console.log('Starting testdriverai with command:', command);
     terminal.sendText(command, true);
 
     const args: string[] = [];
@@ -113,7 +119,9 @@ export class TDInstance extends EventEmitter<EventsMap> {
       args.push(path.join('testdriver', this.file));
     }
 
-    this.process = fork(testdriverPath, args, {
+    let jsPath = getJSPath();
+
+    this.process = fork(jsPath, args, {
       cwd: this.cwd,
       stdio: 'pipe',
       env: {

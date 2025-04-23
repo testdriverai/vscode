@@ -16,6 +16,16 @@ function getExecutablePath(): string {
   }
 }
 
+function getJSPath(): string {
+  const npmRoot = execSync('npm root -g', { encoding: 'utf8' }).trim();
+  const jsPath = path.join(npmRoot, 'testdriverai', 'index.js');
+  if (fs.existsSync(jsPath)) {
+    return jsPath;
+  } else {
+    throw new Error('testdriverai package not found in global npm root.');
+  }
+}
+
 function getPackageJsonVersion(): string {
   try {
     const npmRoot = execSync('npm root -g', { encoding: 'utf8' }).trim();
@@ -64,4 +74,4 @@ function getPackagePath(): string {
   }
 }
 
-export { getExecutablePath, getPackageJsonVersion, compareVersions, getPackagePath };
+export { getExecutablePath, getPackageJsonVersion, compareVersions, getPackagePath, getJSPath };
