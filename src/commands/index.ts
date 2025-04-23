@@ -23,8 +23,17 @@ const registerOtherCommands = () => {
   vscode.commands.registerCommand(
     'testdriver.codeblock.run',
     async (yaml: string) => {
-      const instance = await getChatInstance();
-      await instance.run(`/yaml ${encodeURIComponent(yaml)}`);
+      vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Running TestDriver codeblock...",
+          cancellable: true,
+        },
+        async () => {
+          const instance = await getChatInstance();
+          await instance.run(`/yaml ${encodeURIComponent(yaml)}`);
+        }
+      );
     },
   );
 };
