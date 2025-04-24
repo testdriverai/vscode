@@ -4,15 +4,14 @@ import fs from 'fs';
 
 function getExecutablePath(): string {
   try {
-    const cmd = process.platform === 'win32' ? 'where testdriverai' : 'which testdriverai';
-    const resolvedPath = execSync(cmd, { encoding: 'utf8' }).split('\n')[0].trim();
+    const resolvedPath = path.join(getPackagePath(), "index.js");
     if (fs.existsSync(resolvedPath)) {
       return resolvedPath;
     } else {
       throw new Error('Binary found but does not exist on disk.');
     }
   } catch (err) {
-    throw new Error('testdriverai executable not found in PATH.');
+    throw new Error('testdriverai index.js not found');
   }
 }
 
