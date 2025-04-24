@@ -274,6 +274,8 @@ export class TDInstance extends EventEmitter<EventsMap> {
         });
         this.once('exit', () => reject(new Error('Process exited')));
         signal.onabort = () => {
+          console.log('Aborting command');
+          this.destroy();
           reject(new Error('Command aborted'));
         };
         switch (this.state) {
@@ -292,6 +294,8 @@ export class TDInstance extends EventEmitter<EventsMap> {
     return new Promise<{ fullOutput: string; events: MarkdownParserEvent[] }>(
       (resolve, reject) => {
         signal.onabort = () => {
+          console.log('Aborting command');
+          this.destroy();
           reject(new Error('Command aborted'));
         };
         const result: { fullOutput: string; events: MarkdownParserEvent[] } = {

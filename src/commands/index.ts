@@ -29,8 +29,17 @@ const registerOtherCommands = () => {
           title: "Running TestDriver codeblock...",
           cancellable: true,
         },
-        async () => {
+        async (progress, token) => {
           const instance = await getChatInstance();
+
+          token.onCancellationRequested(() => {
+            instance.destroy();
+          });
+
+          instance.on("status", (status: string) => {
+            progress.report({ message: status });
+          });
+
           await instance.run(`/yaml ${encodeURIComponent(yaml)}`);
         }
       );
