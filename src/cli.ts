@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import nodeIPC from 'node-ipc';
 import * as vscode from 'vscode';
 import EventEmitter from 'node:events';
 import { ChildProcess, fork } from 'node:child_process';
@@ -10,12 +9,12 @@ import {
   MarkdownStreamParser,
   getActiveWorkspaceFolder,
 } from './utils';
-
-import { getExecutablePath, getPackageJsonVersion, compareVersions, getJSPath } from './npm';
-
-type InferType<T> = T extends new () => infer U ? U : undefined;
-type IPCType = InferType<typeof nodeIPC.IPC>;
-const { IPC } = nodeIPC;
+import {
+  getJSPath,
+  compareVersions,
+  getExecutablePath,
+  getPackageJsonVersion,
+} from './npm';
 
 interface EventsMap {
   vm_url: [string];
@@ -35,7 +34,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
   public file?: string;
   public env: Record<string, string> = {};
   state: 'pending' | 'idle' | 'busy' | 'exit';
-  private client: IPCType;
   private process: ChildProcess;
   private overlayId?: string;
   private cleanup?: () => void;
@@ -81,19 +79,23 @@ export class TDInstance extends EventEmitter<EventsMap> {
     let testdriverPath;
     try {
       testdriverPath = getExecutablePath();
-    } catch(err) {
+    } catch {
       // display error to user
       vscode.window.showErrorMessage(
         '`testdriverai` executable not found in PATH. Install `testdriverai` globally using `npm install -g testdriverai@beta`',
       );
-      throw new Error('`testdriverai` not found in PATH. Install `testdriverai` globally using `npm install -g testdriverai@beta`');
+      throw new Error(
+        '`testdriverai` not found in PATH. Install `testdriverai` globally using `npm install -g testdriverai@beta`',
+      );
     }
 
     const testdriverVersion = getPackageJsonVersion();
 
     if (compareVersions(testdriverVersion, requiredVersion) <= 0) {
       const message = `testdriverai version must be greater than ${requiredVersion}. Current version: ${testdriverVersion}`;
-      console.error('Error: testdriverai version is too old. Please update to the latest version.');
+      console.error(
+        'Error: testdriverai version is too old. Please update to the latest version.',
+      );
       vscode.window.showErrorMessage(message);
       throw new Error(message);
     }
@@ -110,7 +112,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
       ? `powershell -NoProfile -Command "& '${quotedPath}' --renderer ${rendererId}"`
       : `${quotedPath} --renderer ${rendererId}`;
 
-
     console.log('Starting testdriverai with command:', command);
     terminal.sendText(command, true);
 
@@ -119,11 +120,11 @@ export class TDInstance extends EventEmitter<EventsMap> {
       args.push(path.join('testdriver', this.file));
     }
 
-    let jsPath = getJSPath();
+    const jsPath = getJSPath();
 
     this.process = fork(jsPath, args, {
       cwd: this.cwd,
-      stdio: 'pipe',
+      stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
       env: {
         ...process.env,
         ...this.env,
@@ -142,21 +143,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
       outputChannel.show();
     }
 
-    import('strip-ansi').then((stripAnsi) => {
-
-
-      this.process.stdout.on('data', (data) => {
-        this.emit('stdout', data.toString());
-        const strippedData = stripAnsi.default(data.toString());
-        outputChannel.append(strippedData);
-      });
-      this.process.stderr.on('data', (data) => {
-        this.emit('stderr', data.toString());
-        const strippedData = stripAnsi.default(data.toString());
-        outputChannel.append(strippedData);
-      });
-    });
-
     this.process.once('error', (e) => {
       console.error('Error starting process', e);
       this.emit('exit', 1);
@@ -166,8 +152,21 @@ export class TDInstance extends EventEmitter<EventsMap> {
       this.emit('exit', code);
     });
 
-    this.process.once('spawn', () => {
+    this.process.once('spawn', async () => {
       let retryCount = 0;
+
+      const stripAnsi = await import('strip-ansi');
+      this.process.stdout?.on('data', (data) => {
+        this.emit('stdout', data.toString());
+        const strippedData = stripAnsi.default(data.toString());
+        outputChannel.append(strippedData);
+      });
+
+      this.process.stderr?.on('data', (data) => {
+        this.emit('stderr', data.toString());
+        const strippedData = stripAnsi.default(data.toString());
+        outputChannel.append(strippedData);
+      });
 
       const onConnect = () => {
         retryCount = 0;
@@ -182,14 +181,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
       };
 
       const onDisconnect = () => {
-
         if (this.state !== 'pending') {
           this.emit('exit', null);
         }
       };
 
-      const handleMessage = (message) => {
-
+      const handleMessage = (message: { event: string; data: unknown }) => {
         let d;
         try {
           d = message;
@@ -228,7 +225,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
             this.emit('exit', d.data as number);
             this.destroy();
             break;
-
         }
       };
 
@@ -267,7 +263,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
     const signal = options.signal ?? new AbortController().signal;
     do {
       await new Promise((resolve, reject) => {
-
         this.once('idle', () => {
           resolve(true);
         });
@@ -329,10 +324,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
           });
         });
 
-        this.process.send(JSON.stringify({
-          event: 'input',
-          data: command,
-        }));
+        this.process.send(
+          JSON.stringify({
+            event: 'input',
+            data: command,
+          }),
+        );
       },
     )
       .then((result) => {
@@ -375,7 +372,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
     this.process.stdout?.removeAllListeners();
     this.process.stderr?.removeAllListeners();
     this.cleanup?.();
-    this.client.disconnect(this.serverId);
     this.process.kill(9);
     this.state = 'exit';
   }
