@@ -1,14 +1,25 @@
 import * as vscode from 'vscode';
-import { parseDocument, Document } from 'yaml';
+import { parseDocument, isMap, isSeq, Pair, Node, Document } from 'yaml';
 import { getPackagePath } from './npm';
 import Ajv from 'ajv';
 
 const findNodeByPath = (doc: Document.Parsed, path: string): any => {
-
-
   const parts = path.split('/').slice(1); // Remove leading slash
-  const node = doc.getIn(parts, true);   // Get original YAML node, not JSON-converted
-  return node?.cstNode || node?.key?.cstNode || null;
+  let currentNode: any = doc.contents;
+
+  for (const part of parts) {
+    if (isMap(currentNode)) {
+      const pair = currentNode.items.find((item: any) => item.key?.value === part);
+      currentNode = pair?.value;
+    } else if (isSeq(currentNode)) {
+      const index = parseInt(part, 10);
+      currentNode = currentNode.items[index];
+    } else {
+      return null;
+    }
+  }
+
+  return currentNode?.cstNode ?? null; // Return CST node, which has `range`
 };
 
 export function validate(context: vscode.ExtensionContext) {
@@ -26,30 +37,28 @@ export function validate(context: vscode.ExtensionContext) {
     const diagnostics: vscode.Diagnostic[] = [];
 
     try {
-      const doc = parseDocument(text, { keepCstNodes: true });
-
-      const jsonData = doc.toJSON(); // Just for AJV
+      const doc = parseDocument(text, { keepSourceTokens: true });
+      const jsonData = doc.toJSON();
       const valid = ajv.validate(schema, jsonData);
 
       if (!valid && ajv.errors) {
         for (const error of ajv.errors) {
           const cstNode = findNodeByPath(doc, error.instancePath || '');
-          const range = cstNode?.rangeAsLinePos;
 
-          if (range) {
-            const startPos = new vscode.Position(range.start.line, range.start.col);
-            const endPos = new vscode.Position(range.end.line, range.end.col);
+          if (cstNode?.range) {
+            const [startOffset, endOffset] = cstNode.range;
+            const startPos = document.positionAt(startOffset);
+            const endPos = document.positionAt(endOffset);
 
-            const diagnostic = new vscode.Diagnostic(
+            diagnostics.push(new vscode.Diagnostic(
               new vscode.Range(startPos, endPos),
-              error.instancePath + ' ' + error.message || 'Validation error',
+              `${error.instancePath || '/'} ${error.message ?? 'Validation error'}`,
               vscode.DiagnosticSeverity.Error
-            );
-            diagnostics.push(diagnostic);
+            ));
           } else {
             diagnostics.push(new vscode.Diagnostic(
-              new vscode.Range(0, 0, 0, 999),
-              error.instancePath + ' ' + error.message || 'Validation error (no position info)',
+              new vscode.Range(0, 0, 0, 1),
+              `${error.instancePath || '/'} ${error.message ?? 'Validation error (no position info)'}`,
               vscode.DiagnosticSeverity.Error
             ));
           }
@@ -57,7 +66,7 @@ export function validate(context: vscode.ExtensionContext) {
       }
     } catch (err: any) {
       diagnostics.push(new vscode.Diagnostic(
-        new vscode.Range(0, 0, 0, 999),
+        new vscode.Range(0, 0, 0, 1),
         `YAML Parse error: ${err.message}`,
         vscode.DiagnosticSeverity.Error
       ));
