@@ -1,25 +1,31 @@
 import * as vscode from 'vscode';
-import { parseDocument, isMap, isSeq, Pair, Node, Document } from 'yaml';
+import { parseDocument, isMap, isSeq, Pair, Node, Scalar, YAMLMap, YAMLSeq, Document } from 'yaml';
 import { getPackagePath } from './npm';
 import Ajv from 'ajv';
 
-const findNodeByPath = (doc: Document.Parsed, path: string): any => {
-  const parts = path.split('/').slice(1); // Remove leading slash
-  let currentNode: any = doc.contents;
+const buildPathMap = (node: Node | null, path = '', map = new Map<string, Node>()): Map<string, Node> => {
+  if (!node) return map;
+  map.set(path, node);
 
-  for (const part of parts) {
-    if (isMap(currentNode)) {
-      const pair = currentNode.items.find((item: any) => item.key?.value === part);
-      currentNode = pair?.value;
-    } else if (isSeq(currentNode)) {
-      const index = parseInt(part, 10);
-      currentNode = currentNode.items[index];
-    } else {
-      return null;
+  if (isMap(node)) {
+    for (const item of (node as YAMLMap).items) {
+      const key = item.key instanceof Scalar ? String(item.key.value) : String(item.key);
+      const newPath = `${path}/${key}`;
+      if (item.value && typeof item.value === 'object') {
+        buildPathMap(item.value as Node, newPath, map);
+      }
     }
+  } else if (isSeq(node)) {
+    (node as YAMLSeq).items.forEach((item, index) => {
+      const newPath = `${path}/${index}`;
+      if (item && typeof item === 'object') {
+        map.set(newPath, item as Node);
+        buildPathMap(item as Node, newPath, map);
+      }
+    });
   }
 
-  return currentNode?.cstNode ?? null; // Return CST node, which has `range`
+  return map;
 };
 
 export function validate(context: vscode.ExtensionContext) {
@@ -38,12 +44,18 @@ export function validate(context: vscode.ExtensionContext) {
 
     try {
       const doc = parseDocument(text, { keepSourceTokens: true });
+      const pathMap = buildPathMap(doc.contents);
       const jsonData = doc.toJSON();
       const valid = ajv.validate(schema, jsonData);
 
       if (!valid && ajv.errors) {
         for (const error of ajv.errors) {
-          const cstNode = findNodeByPath(doc, error.instancePath || '');
+          let node = pathMap.get(error.instancePath || '');
+          if (!node && error.instancePath) {
+            const parentPath = error.instancePath.split('/').slice(0, -1).join('/');
+            node = pathMap.get(parentPath || '');
+          }
+          const cstNode = (node as any)?.cstNode;
 
           if (cstNode?.range) {
             const [startOffset, endOffset] = cstNode.range;
