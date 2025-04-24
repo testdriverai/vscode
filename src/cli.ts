@@ -201,6 +201,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
             this.emit((d.data as boolean) ? 'idle' : 'busy');
             break;
           case 'output':
+            this.emit('output', d.data as string);
             break;
           case 'status':
             this.emit('status', d.data as string);
