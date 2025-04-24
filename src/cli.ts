@@ -145,10 +145,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     this.process.once('error', (e) => {
       console.error('Error starting process', e);
+      this.state = 'exit';
       this.emit('exit', 1);
     });
 
     this.process.once('exit', (code) => {
+      this.state = 'exit';
       this.emit('exit', code);
     });
 
@@ -170,6 +172,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
       const onConnect = () => {
         retryCount = 0;
+        this.state = 'pending';
         this.emit('pending');
       };
       const onError = () => {
@@ -177,11 +180,13 @@ export class TDInstance extends EventEmitter<EventsMap> {
         if (this.state === 'pending' && retryCount <= MAX_RETRIES) {
           return;
         }
+        this.state = 'exit';
         this.emit('exit', 1);
       };
 
       const onDisconnect = () => {
         if (this.state !== 'pending') {
+          this.state = 'exit';
           this.emit('exit', null);
         }
       };
@@ -198,9 +203,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
         switch (d.event) {
           case 'interactive':
             this.state = (d.data as boolean) ? 'idle' : 'busy';
-            this.emit((d.data as boolean) ? 'idle' : 'busy');
+            this.emit(this.state);
             break;
           case 'output':
+            this.emit('output', d.data as string);
             break;
           case 'status':
             this.emit('status', d.data as string);
@@ -338,6 +344,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
       })
       .catch((err) => {
         this.isLocked = false;
+        this.state = 'exit';
         this.emit('exit', 1);
         throw err;
       });
@@ -380,9 +387,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
 let chatInstance: TDInstance | null = null;
 
 export const getChatInstance = async () => {
-
   if (!chatInstance || chatInstance.state === 'exit') {
-
     const workingDir = getActiveWorkspaceFolder()?.uri.fsPath;
 
     let env: Record<string, string> = {};
