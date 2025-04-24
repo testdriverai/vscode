@@ -34,14 +34,7 @@ const handler: vscode.ChatRequestHandler = async (
       const abortController = new AbortController();
       token.onCancellationRequested(() => abortController.abort());
 
-      const instance = (await getChatInstance()) as unknown as {
-        on: (event: 'status', handler: (status: string) => void) => void;
-        focus: () => void;
-        run: (
-          command: string,
-          options: { signal: AbortSignal; callback: (event: any) => void },
-        ) => Promise<void>;
-      };
+      const instance = await getChatInstance();
 
       instance.focus();
 
@@ -52,6 +45,7 @@ const handler: vscode.ChatRequestHandler = async (
       await instance.run(`/${request.command} ${request.prompt}`, {
         signal: abortController.signal,
         callback: (event) => {
+
           if (typeof event === 'string') {
             stream.markdown(event);
           } else {
