@@ -8,26 +8,46 @@ export const logger = createLogger({
     new transports.Console({
       format: format.combine(
         format.errors({ stack: true }),
-        format.label({ label: pkg.version }),
         format.timestamp(),
         format.colorize(),
-        format.align(),
-        // format.simple(),
         format.printf((info) => {
           let stack = '';
           if ('stack' in info) {
             stack = `\n${info.stack}`;
           }
-          return `${info.timestamp} [${info.label}] ${info.level}: ${
+          return `${info.timestamp} ${info.level}: ${
             typeof info.message === 'string'
               ? info.message
               : JSON.stringify(info.message, null, 2)
-          }${stack}`;
+          } ${JSON.stringify(
+            omit(info, [
+              'stack',
+              'message',
+              'level',
+              'service',
+              'version',
+              'env',
+              'timestamp',
+            ]),
+            null,
+            2,
+          )}${stack}`;
         }),
       ),
     }),
   ],
 });
+
+function omit<R extends Record<string | number | symbol, unknown>>(
+  obj: R,
+  keys: Array<keyof R>,
+): Omit<R, keyof typeof keys> {
+  const result = { ...obj };
+  for (const key of keys) {
+    delete result[key];
+  }
+  return result as Omit<R, keyof typeof keys>;
+}
 
 export function init(env: Env) {
   const ddClientToken = 'pub24e93578176f1a88e1da4ef7bf77eb50';
