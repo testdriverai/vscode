@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { TDInstance } from './cli';
+import { logger } from './utils/logger';
 import { beautifyFilename, getUri } from './utils/helpers';
 
 const FLAT = false;
@@ -141,7 +142,7 @@ const setupRunProfiles = (controller: vscode.TestController) => {
           .catch((err) => run.failed(test, new vscode.TestMessage(err.message)))
           .finally(() => instance.destroy());
 
-        console.log(`Test ${test.id} finished`);
+        logger.info(`Test ${test.id} finished`);
       } else {
         test.children.forEach((test) => addToQueue(test));
       }

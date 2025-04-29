@@ -6,6 +6,7 @@ import {
   getActiveWorkspaceFolder,
 } from './utils/helpers';
 import spec from './spec';
+import { logger } from './utils/logger';
 
 export const PARTICIPANT_ID = 'testdriver.driver';
 
@@ -114,7 +115,7 @@ const handler: vscode.ChatRequestHandler = async (
       }
       parser.end();
     } catch (err) {
-      console.log('err', err);
+      logger.info('err', err);
     }
   }
 };

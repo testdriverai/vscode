@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { PARTICIPANT_ID } from '../chat';
+import { logger } from '../utils/logger';
 
 const getUserPrompt = async () => {
   let userInput: string | undefined;
@@ -39,6 +40,12 @@ export const handleTDCommandInChat = async (
 };
 
 export const testdriverCommand = (command: 'dry' | 'try') => async () => {
-  const prompt = await getUserPrompt();
-  await handleTDCommandInChat(command, prompt);
+  try {
+    const prompt = await getUserPrompt();
+    await handleTDCommandInChat(command, prompt);
+  } catch (error) {
+    logger.error('Error handling TestDriver command', {
+      error,
+    });
+  }
 };

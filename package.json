@@ -346,6 +346,7 @@
     "js-yaml-source-map": "^0.2.2",
     "markdown-parser": "^0.0.8",
     "node-ipc": "^12.0.0",
+    "winston": "^3.17.0",
     "ws": "^8.18.1",
     "yaml": "^2.7.1"
   },
