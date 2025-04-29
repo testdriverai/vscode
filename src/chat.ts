@@ -25,14 +25,19 @@ const handler: vscode.ChatRequestHandler = async (
   context,
   stream,
   token,
-): Promise<void> => {
+) => {
   if (request.command) {
     const commands = ['dry', 'try'];
     if (commands.includes(request.command)) {
       const workspace = getActiveWorkspaceFolder();
       if (!workspace) {
         stream.progress('No workspace found');
-        return;
+        logger.warn('No workspace found for chat request');
+        return {
+          errorDetails: {
+            message: 'No workspace found',
+          },
+        };
       }
 
       const abortController = new AbortController();
@@ -46,33 +51,69 @@ const handler: vscode.ChatRequestHandler = async (
         stream.progress(status);
       });
 
-      await instance.run(`/${request.command} ${request.prompt}`, {
-        signal: abortController.signal,
-        callback: (event) => {
-
-          if (typeof event === 'string') {
-            stream.markdown(event);
-          } else {
-            if (['yaml', 'yml'].includes(event.type?.toLowerCase() ?? '')) {
-              stream.button({
-                command: 'testdriver.codeblock.run',
-                title: vscode.l10n.t('Run Steps'),
-                arguments: [event.content], // Send the YML code as an argument
-              });
-            }
-          }
-        },
-      });
+      try {
+        const { fullOutput } = await instance.run(
+          `/${request.command} ${request.prompt}`,
+          {
+            signal: abortController.signal,
+            callback: (event) => {
+              if (typeof event === 'string') {
+                stream.markdown(event);
+              } else {
+                if (['yaml', 'yml'].includes(event.type?.toLowerCase() ?? '')) {
+                  stream.button({
+                    command: 'testdriver.codeblock.run',
+                    title: vscode.l10n.t('Run Steps'),
+                    arguments: [event.content], // Send the YML code as an argument
+                  });
+                }
+              }
+            },
+          },
+        );
+        return {
+          metadata: {
+            isCli: true,
+            result: fullOutput,
+            prompt: request.prompt,
+            history: context.history,
+            command: request.command,
+          },
+        };
+      } catch (err: unknown) {
+        logger.error(`Failed handling chat command "${request.command}"`, err);
+        return {
+          errorDetails: {
+            message: `Failed handling chat command "${request.command}": ${(err as Error)?.message}`,
+          },
+          metadata: {
+            isCli: true,
+            prompt: request.prompt,
+            command: request.command,
+            history: context.history,
+          },
+        };
+      }
     } else {
       stream.progress('Unsupported command: ' + request.command);
+      return {
+        errorDetails: {
+          message: `Unsupported command`,
+        },
+        metadata: {
+          isCli: true,
+          prompt: request.prompt,
+          command: request.command,
+          history: context.history,
+        },
+      };
     }
-    return;
   } else {
     stream.progress('thinking...');
 
-    try {
-      const messages = [vscode.LanguageModelChatMessage.User(spec)];
+    const messages = [vscode.LanguageModelChatMessage.User(spec)];
 
+    try {
       // get all the previous participant messages
       const previousMessages = context.history.filter(
         (h) => h instanceof vscode.ChatResponseTurn,
@@ -108,14 +149,36 @@ const handler: vscode.ChatRequestHandler = async (
             });
           }
         });
+      let fullMessage = '';
       for await (const fragment of chatResponse.text) {
+        fullMessage += fragment;
         for (const char of fragment) {
           parser.processChar(char);
         }
       }
       parser.end();
+      return {
+        metadata: {
+          isCli: false,
+          result: fullMessage,
+          prompt: request.prompt,
+          command: request.command,
+          history: context.history,
+        },
+      };
     } catch (err) {
-      logger.info('err', err);
+      logger.error('Failed handling chat request', err);
+      return {
+        errorDetails: {
+          message: `Failed handling chat request: ${(err as Error)?.message}`,
+        },
+        metadata: {
+          isCli: false,
+          prompt: request.prompt,
+          command: request.command,
+          history: context.history,
+        },
+      };
     }
   }
 };
