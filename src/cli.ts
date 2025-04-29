@@ -8,13 +8,13 @@ import {
   MarkdownParserEvent,
   MarkdownStreamParser,
   getActiveWorkspaceFolder,
-} from './utils';
+} from './utils/helpers';
 import {
   getJSPath,
   compareVersions,
   getExecutablePath,
   getPackageJsonVersion,
-} from './npm';
+} from './utils/npm';
 
 interface EventsMap {
   vm_url: [string];

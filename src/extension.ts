@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
-import { registerChatParticipant } from './chat';
-import { registerCommands } from './commands';
-import { validate } from './schema';
 import { setupTests } from './tests';
+import { validate } from './utils/schema';
+import { registerCommands } from './commands';
+import { registerChatParticipant } from './chat';
+
 export function deactivate() {}
 
 export async function activate(context: vscode.ExtensionContext) {

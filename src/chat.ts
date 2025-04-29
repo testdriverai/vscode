@@ -1,7 +1,10 @@
 import path from 'path';
 import * as vscode from 'vscode';
 import { getChatInstance } from './cli';
-import { getActiveWorkspaceFolder, MarkdownStreamParser } from './utils';
+import {
+  MarkdownStreamParser,
+  getActiveWorkspaceFolder,
+} from './utils/helpers';
 import spec from './spec';
 
 export const PARTICIPANT_ID = 'testdriver.driver';

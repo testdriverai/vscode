@@ -11,7 +11,7 @@ function getExecutablePath(): string {
     } else {
       throw new Error('Binary found but does not exist on disk.');
     }
-  } catch (err) {
+  } catch {
     throw new Error('testdriverai executable not found in PATH.');
   }
 }
@@ -69,7 +69,7 @@ function getPackagePath(): string {
     } else {
       throw new Error('testdriverai package not found in global npm root.');
     }
-  } catch (err) {
+  } catch {
     throw new Error('Failed to resolve global npm root.');
   }
 }

@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
-import { getExecutablePath, getPackageJsonVersion, compareVersions } from '../npm';
+import {
+  compareVersions,
+  getExecutablePath,
+  getPackageJsonVersion,
+} from '../utils/npm';
 
 export const initialize = async () => {
 

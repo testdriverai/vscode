@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { TDInstance } from './cli';
-import { beautifyFilename, getUri } from './utils';
+import { beautifyFilename, getUri } from './utils/helpers';
 
 const FLAT = false;
 const testGlobPattern = 'testdriver/**/*.{yml,yaml}';
