@@ -4,9 +4,10 @@ import {
   getExecutablePath,
   getPackageJsonVersion,
 } from '../utils/npm';
-import { logger } from '../utils/logger';
+import { logger, track } from '../utils/logger';
 
 export const initialize = async () => {
+  track({ event: 'command.initialize' });
 
   logger.info('Initializing TestDriver...');
 
@@ -80,5 +81,4 @@ export const initialize = async () => {
     });
     throw err;
   }
-
 };

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { install } from './install';
-import { logger } from '../utils/logger';
+import { logger, track } from '../utils/logger';
 import { getChatInstance } from '../cli';
 import { initialize } from './initialize';
 import { testdriverCommand } from './chat';
@@ -17,13 +17,13 @@ const registerCtrlPCommands = () => {
 
   vscode.commands.registerCommand('testdriver.init', initialize);
   vscode.commands.registerCommand('testdriver.install', install);
-
 };
 
 const registerOtherCommands = () => {
   vscode.commands.registerCommand(
     'testdriver.codeblock.run',
     async (yaml: string) => {
+      track({ event: 'command.codeblock.run' });
       vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -60,6 +60,7 @@ export const registerCommands = () => {
 
   vscode.commands.registerCommand('testdriver.walkthrough', () => {
     logger.info('Opening walkthrough');
+    track({ event: 'walkthrough.started' });
 
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
@@ -68,6 +69,8 @@ export const registerCommands = () => {
     );
   });
   vscode.commands.registerCommand('testdriver.walkthroughDeploy', () => {
+    track({ event: 'walkthrough.deploy.started' });
+
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
       'testdriverai.testdriver#deploy',
@@ -75,6 +78,8 @@ export const registerCommands = () => {
     );
   });
   vscode.commands.registerCommand('testdriver.walkthroughGenerate', () => {
+    track({ event: 'walkthrough.generate.started' });
+
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
       'testdriverai.testdriver#generate',
@@ -82,10 +87,14 @@ export const registerCommands = () => {
     );
   });
   vscode.commands.registerCommand('testdriver.openDocsAtCI', () => {
+    track({ event: 'docs.ci' });
+
     const docsUrl = 'https://testdriver.mintlify.app/getting-started/ci';
     vscode.env.openExternal(vscode.Uri.parse(docsUrl));
   });
   vscode.commands.registerCommand('testdriver.openDocsRoot', () => {
+    track({ event: 'docs.root' });
+
     const docsUrl = 'https://testdriver.mintlify.app';
     vscode.env.openExternal(vscode.Uri.parse(docsUrl));
   });

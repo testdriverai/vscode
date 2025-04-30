@@ -6,7 +6,7 @@ import {
   getActiveWorkspaceFolder,
 } from './utils/helpers';
 import spec from './spec';
-import { logger } from './utils/logger';
+import { track, logger } from './utils/logger';
 
 export const PARTICIPANT_ID = 'testdriver.driver';
 
@@ -18,6 +18,19 @@ export function registerChatParticipant(context: vscode.ExtensionContext) {
   participant.iconPath = vscode.Uri.file(
     path.join(context.extensionUri.fsPath, 'icon.png'),
   );
+
+  participant.onDidReceiveFeedback((feedback) => {
+    track({
+      event: 'chat.feedback',
+      properties: {
+        kind:
+          feedback.kind === vscode.ChatResultFeedbackKind.Helpful
+            ? 'helpful'
+            : 'unhelpful',
+        result: feedback.result,
+      },
+    });
+  });
 }
 
 const handler: vscode.ChatRequestHandler = async (
@@ -26,6 +39,13 @@ const handler: vscode.ChatRequestHandler = async (
   stream,
   token,
 ) => {
+  track({
+    event: 'chat.request',
+    properties: {
+      prompt: request.prompt,
+      command: request.command,
+    },
+  });
   if (request.command) {
     const commands = ['dry', 'try'];
     if (commands.includes(request.command)) {
@@ -41,7 +61,13 @@ const handler: vscode.ChatRequestHandler = async (
       }
 
       const abortController = new AbortController();
-      token.onCancellationRequested(() => abortController.abort());
+      token.onCancellationRequested(() => {
+        track({
+          event: 'chat.request.cancelled',
+          properties: { prompt: request.prompt, command: request.command },
+        });
+        abortController.abort();
+      });
 
       const instance = await getChatInstance();
 

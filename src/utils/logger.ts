@@ -103,6 +103,7 @@ export const track = (payload: {
   timestamp?: Date;
   context?: Record<string, unknown>;
 }) => {
+  logger.info(payload.event, payload.properties);
   return analytics.track({
     ...(userId ? { userId } : { anonymousId: machineId }),
     ...payload,

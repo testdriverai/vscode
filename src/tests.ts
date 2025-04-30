@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { TDInstance } from './cli';
-import { logger } from './utils/logger';
+import { track, logger } from './utils/logger';
 import { beautifyFilename, getUri } from './utils/helpers';
 
 const FLAT = false;
@@ -96,11 +96,16 @@ const setupRunProfiles = (controller: vscode.TestController) => {
     token: vscode.CancellationToken,
   ) {
     const run = controller.createTestRun(request);
+    track({ event: 'test.run.start' });
     const queue: vscode.TestItem[] = [];
     const addToQueue = (test: vscode.TestItem) => {
       if (request.exclude?.includes(test)) {
         return;
       }
+      track({
+        event: 'test.item.queued',
+        properties: { id: test.id, path: test.uri?.fsPath },
+      });
       queue.push(test);
       run.enqueued(test);
     };
@@ -110,6 +115,10 @@ const setupRunProfiles = (controller: vscode.TestController) => {
     } else {
       controller.items.forEach((test) => addToQueue(test));
     }
+
+    token.onCancellationRequested(() => {
+      track({ event: 'test.run.canceled' });
+    });
 
     while (queue.length > 0 && !token.isCancellationRequested) {
       const test = queue.shift()!;
@@ -138,8 +147,20 @@ const setupRunProfiles = (controller: vscode.TestController) => {
           .run(`/run ${relativePath}`, {
             signal: abortController.signal,
           })
-          .then(() => run.passed(test))
-          .catch((err) => run.failed(test, new vscode.TestMessage(err.message)))
+          .then(() => {
+            run.passed(test);
+            track({
+              event: 'test.item.passed',
+              properties: { id: test.id, path: test.uri?.fsPath },
+            });
+          })
+          .catch((err) => {
+            run.failed(test, new vscode.TestMessage(err.message));
+            track({
+              event: 'test.item.failed',
+              properties: { id: test.id, path: test.uri?.fsPath },
+            });
+          })
           .finally(() => instance.destroy());
 
         logger.info(`Test ${test.id} finished`);
@@ -150,6 +171,9 @@ const setupRunProfiles = (controller: vscode.TestController) => {
 
     // Make sure to end the run after all tests have been executed:
     run.end();
+    track({
+      event: 'test.run.end',
+    });
   }
 
   controller.createRunProfile(

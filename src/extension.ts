@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { init } from './utils/init';
 import { setupTests } from './tests';
-import { logger } from './utils/logger';
+import { track, logger } from './utils/logger';
 import { validate } from './utils/schema';
 import { registerCommands } from './commands';
 import { registerChatParticipant } from './chat';
@@ -21,6 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
   });
 
   if (isFirstInstall) {
+    track({ event: 'extension.installed' });
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
       'testdriverai.testdriver#gettingStarted',
@@ -28,6 +29,8 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     context.globalState.update('testdriver.firstInstall', false);
   }
+
+  track({ event: 'extension.activated' });
 
   try {
     registerCommands();
