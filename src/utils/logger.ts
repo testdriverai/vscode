@@ -1,7 +1,13 @@
+import * as vscode from 'vscode';
+import Analytics from 'analytics-node';
 import { format, transports, createLogger } from 'winston';
 import { Env } from './env';
 import pkg from '../../package.json';
 
+let userId = '';
+let machineId = '';
+
+const analytics = new Analytics('dnhLCaCxKyJhOqOgXmAyHzcbPrfsB09e');
 export const logger = createLogger({
   level: 'debug',
   transports: [
@@ -28,6 +34,8 @@ export const logger = createLogger({
               'version',
               'env',
               'timestamp',
+              'machineId',
+              'userId',
             ]),
             null,
             2,
@@ -49,17 +57,24 @@ function omit<R extends Record<string | number | symbol, unknown>>(
   return result as Omit<R, keyof typeof keys>;
 }
 
-export function init(env: Env) {
+export function init(context: vscode.ExtensionContext, env: Env) {
   const ddClientToken = 'pub24e93578176f1a88e1da4ef7bf77eb50';
 
   if (env !== 'development') {
     logger.level = 'info';
   }
 
+  if (!machineId) {
+    machineId = context.globalState.get('machineId') ?? crypto.randomUUID();
+    userId = (context.globalState.get('userId') ?? '') as string;
+    context.globalState.update('machineId', machineId);
+  }
+
   logger.defaultMeta = {
     env,
     service: 'vscode',
     version: pkg.version,
+    machineId,
   };
 
   logger.add(
@@ -70,6 +85,30 @@ export function init(env: Env) {
       format: format.json(),
     }),
   );
-
-  return logger;
 }
+
+export const setUser = (id: string | null) => {
+  userId = id ?? '';
+  const defaultMeta = logger.defaultMeta ?? {};
+  if (userId) {
+    logger.defaultMeta = { ...defaultMeta, userId };
+  } else {
+    logger.defaultMeta = { ...omit(defaultMeta, ['userId']) };
+  }
+};
+
+export const track = (payload: {
+  event: string;
+  properties?: Record<string, unknown>;
+  timestamp?: Date;
+  context?: Record<string, unknown>;
+}) => {
+  return analytics.track({
+    ...(userId ? { userId } : { anonymousId: machineId }),
+    ...payload,
+    properties: {
+      ...(payload.properties ?? {}),
+      machineId,
+    },
+  });
+};

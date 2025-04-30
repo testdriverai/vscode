@@ -1,16 +1,12 @@
 import * as vscode from 'vscode';
-import { init as initEnv, getEnv } from './env';
-import { init as initLogger, logger } from './logger';
+import { init as initEnv } from './env';
+import { init as initLogger } from './logger';
 
 let initialized = false;
 export function init(context: vscode.ExtensionContext) {
-  if (initialized) {
-    return { env: getEnv(), logger };
+  if (!initialized) {
+    initialized = true;
+    const env = initEnv(context);
+    initLogger(context, env);
   }
-
-  initialized = true;
-  const env = initEnv(context);
-  initLogger(env);
-
-  return { env, logger };
 }
