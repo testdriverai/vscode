@@ -31,7 +31,7 @@
     "yamlValidation": [
       {
         "fileMatch": "**/testdriver/*.{yml,yaml}",
-        "url": "./schema.json"
+        "url": "https://raw.githubusercontent.com/testdriverai/testdriverai/v5/schema.json"
       }
     ],
     "walkthroughs": [
