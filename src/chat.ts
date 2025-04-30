@@ -23,7 +23,7 @@ const handler: vscode.ChatRequestHandler = async (
   token,
 ): Promise<void> => {
   if (request.command) {
-    const commands = ['dry', 'try'];
+    const commands = ['dry', 'explore'];
     if (commands.includes(request.command)) {
       const workspace = getActiveWorkspaceFolder();
       if (!workspace) {

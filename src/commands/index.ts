@@ -5,7 +5,7 @@ import { testdriverCommand } from './chat';
 import { getChatInstance } from '../cli';
 
 const registerCtrlPCommands = () => {
-  const chatCommands = ['dry', 'try'] as const;
+  const chatCommands = ['dry', 'explore'] as const;
 
   for (const command of chatCommands) {
     vscode.commands.registerCommand(
