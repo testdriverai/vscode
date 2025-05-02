@@ -110,8 +110,8 @@ export class TDInstance extends EventEmitter<EventsMap> {
     const quotedPath = `"${testdriverPath}"`;
 
     const command = isWin
-      ? `powershell -NoProfile -Command "& '${quotedPath}' --renderer ${rendererId}"`
-      : `${quotedPath} --renderer ${rendererId}`;
+      ? `powershell -NoProfile -Command "& node ${quotedPath} --renderer ${rendererId}"`
+      : `node ${quotedPath} --renderer ${rendererId}`;
 
     logger.info('Starting testdriverai with command:', command);
     terminal.sendText(command, true);
