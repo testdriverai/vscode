@@ -31,6 +31,9 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   track({ event: 'extension.activated' });
+  registerCommands();
+  registerChatParticipant(context);
+  const controller = setupTests();
 
   try {
     registerCommands();
