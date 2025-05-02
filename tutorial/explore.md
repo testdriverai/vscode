@@ -1,4 +1,4 @@
-## About the `/try` Command
+## About the `/explore` Command
 
 1. TestDriver will take a screenshot of the desktop and suggest test steps
 2. TestDriver will use the mouse and keyboard to execute the test steps.

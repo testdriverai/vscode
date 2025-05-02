@@ -65,14 +65,14 @@
             ]
           },
           {
-            "id": "try",
+            "id": "explore",
             "title": "Create your first test",
-            "description": "Tell TestDriver what you want to accomplish with the **/try** command. TestDriver will generate and run commands.\n[Send a /try](command:testdriver.try)",
+            "description": "Tell TestDriver what you want to accomplish with the **/explore** command. TestDriver will generate and run commands.\n[Send a /explore](command:testdriver.explore)",
             "media": {
-              "markdown": "tutorial/try.md"
+              "markdown": "tutorial/explore.md"
             },
             "completionEvents": [
-              "onCommand:testdriver.try"
+              "onCommand:testdriver.explore"
             ]
           },
           {

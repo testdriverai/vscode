@@ -6,7 +6,7 @@ import { initialize } from './initialize';
 import { testdriverCommand } from './chat';
 
 const registerCtrlPCommands = () => {
-  const chatCommands = ['dry', 'try'] as const;
+  const chatCommands = ['dry', 'explore'] as const;
 
   for (const command of chatCommands) {
     vscode.commands.registerCommand(
