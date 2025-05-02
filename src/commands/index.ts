@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
-import { initialize } from './initialize';
 import { install } from './install';
-import { testdriverCommand } from './chat';
+import { logger, track } from '../utils/logger';
 import { getChatInstance } from '../cli';
+import { initialize } from './initialize';
+import { testdriverCommand } from './chat';
 
 const registerCtrlPCommands = () => {
   const chatCommands = ['dry', 'explore'] as const;
@@ -16,32 +17,38 @@ const registerCtrlPCommands = () => {
 
   vscode.commands.registerCommand('testdriver.init', initialize);
   vscode.commands.registerCommand('testdriver.install', install);
-
 };
 
 const registerOtherCommands = () => {
   vscode.commands.registerCommand(
     'testdriver.codeblock.run',
     async (yaml: string) => {
+      track({ event: 'command.codeblock.run' });
       vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
-          title: "Running TestDriver codeblock...",
+          title: 'Running TestDriver codeblock...',
           cancellable: true,
         },
         async (progress, token) => {
-          const instance = await getChatInstance();
+          try {
+            const instance = await getChatInstance();
 
-          token.onCancellationRequested(() => {
-            instance.destroy();
-          });
+            token.onCancellationRequested(() => {
+              instance.destroy();
+            });
 
-          instance.on("status", (status: string) => {
-            progress.report({ message: status });
-          });
+            instance.on('status', (status: string) => {
+              progress.report({ message: status });
+            });
 
-          await instance.run(`/yaml ${encodeURIComponent(yaml)}`);
-        }
+            await instance.run(`/yaml ${encodeURIComponent(yaml)}`);
+          } catch (err) {
+            logger.error('Error running TestDriver codeblock', {
+              error: err,
+            });
+          }
+        },
       );
     },
   );
@@ -52,7 +59,8 @@ export const registerCommands = () => {
   registerOtherCommands();
 
   vscode.commands.registerCommand('testdriver.walkthrough', () => {
-    console.log('Opening walkthrough');
+    logger.info('Opening walkthrough');
+    track({ event: 'walkthrough.started' });
 
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
@@ -61,6 +69,8 @@ export const registerCommands = () => {
     );
   });
   vscode.commands.registerCommand('testdriver.walkthroughDeploy', () => {
+    track({ event: 'walkthrough.deploy.started' });
+
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
       'testdriverai.testdriver#deploy',
@@ -68,6 +78,8 @@ export const registerCommands = () => {
     );
   });
   vscode.commands.registerCommand('testdriver.walkthroughGenerate', () => {
+    track({ event: 'walkthrough.generate.started' });
+
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
       'testdriverai.testdriver#generate',
@@ -75,10 +87,14 @@ export const registerCommands = () => {
     );
   });
   vscode.commands.registerCommand('testdriver.openDocsAtCI', () => {
+    track({ event: 'docs.ci' });
+
     const docsUrl = 'https://testdriver.mintlify.app/getting-started/ci';
     vscode.env.openExternal(vscode.Uri.parse(docsUrl));
   });
   vscode.commands.registerCommand('testdriver.openDocsRoot', () => {
+    track({ event: 'docs.root' });
+
     const docsUrl = 'https://testdriver.mintlify.app';
     vscode.env.openExternal(vscode.Uri.parse(docsUrl));
   });

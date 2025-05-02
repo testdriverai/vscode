@@ -1,18 +1,18 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { logger } from './logger';
 
 function getExecutablePath(): string {
   try {
-    const cmd = process.platform === 'win32' ? 'where testdriverai' : 'which testdriverai';
-    const resolvedPath = execSync(cmd, { encoding: 'utf8' }).split('\n')[0].trim();
+    const resolvedPath = path.join(getPackagePath(), "index.js");
     if (fs.existsSync(resolvedPath)) {
       return resolvedPath;
     } else {
       throw new Error('Binary found but does not exist on disk.');
     }
   } catch (err) {
-    throw new Error('testdriverai executable not found in PATH.');
+    throw new Error('testdriverai index.js not found');
   }
 }
 
@@ -40,7 +40,7 @@ function getPackageJsonVersion(): string {
 
     return currentVersion;
   } catch (err: any) {
-    console.error('Error:', err.message);
+    logger.error('Error:', err.message);
     process.exit(1);
   }
 }
@@ -69,7 +69,7 @@ function getPackagePath(): string {
     } else {
       throw new Error('testdriverai package not found in global npm root.');
     }
-  } catch (err) {
+  } catch {
     throw new Error('Failed to resolve global npm root.');
   }
 }

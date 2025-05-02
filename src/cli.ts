@@ -8,13 +8,14 @@ import {
   MarkdownParserEvent,
   MarkdownStreamParser,
   getActiveWorkspaceFolder,
-} from './utils';
+} from './utils/helpers';
 import {
   getJSPath,
   compareVersions,
   getExecutablePath,
   getPackageJsonVersion,
-} from './npm';
+} from './utils/npm';
+import { logger } from './utils/logger';
 
 interface EventsMap {
   vm_url: [string];
@@ -93,7 +94,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     if (compareVersions(testdriverVersion, requiredVersion) <= 0) {
       const message = `testdriverai version must be greater than ${requiredVersion}. Current version: ${testdriverVersion}`;
-      console.error(
+      logger.error(
         'Error: testdriverai version is too old. Please update to the latest version.',
       );
       vscode.window.showErrorMessage(message);
@@ -101,7 +102,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
     }
 
     if (testdriverVersion) {
-      console.log(`Using testdriverai version: ${testdriverVersion}`);
+      logger.info(`Using testdriverai version: ${testdriverVersion}`);
     }
 
     const isWin = process.platform === 'win32';
@@ -109,10 +110,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
     const quotedPath = `"${testdriverPath}"`;
 
     const command = isWin
-      ? `powershell -NoProfile -Command "& '${quotedPath}' --renderer ${rendererId}"`
-      : `${quotedPath} --renderer ${rendererId}`;
+      ? `powershell -NoProfile -Command "& node ${quotedPath} --renderer ${rendererId}"`
+      : `node ${quotedPath} --renderer ${rendererId}`;
 
-    console.log('Starting testdriverai with command:', command);
+    logger.info('Starting testdriverai with command:', command);
     terminal.sendText(command, true);
 
     const args: string[] = [];
@@ -144,7 +145,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
     }
 
     this.process.once('error', (e) => {
-      console.error('Error starting process', e);
+      logger.error('Error starting process', e);
       this.state = 'exit';
       this.emit('exit', 1);
     });
@@ -196,7 +197,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
         try {
           d = message;
         } catch (e) {
-          console.error('Error parsing message', e);
+          logger.error('Error parsing message', e);
           return;
         }
 
@@ -250,13 +251,13 @@ export class TDInstance extends EventEmitter<EventsMap> {
     });
 
     // Debug
-    this.on('pending', () => console.log('[debug:pending]'))
-      .on('idle', () => console.log('[debug:idle]'))
-      .on('busy', () => console.log('[debug:busy]'))
-      .on('exit', (code) => console.log('[debug:exit]', code))
+    this.on('pending', () => logger.debug('[pending]'))
+      .on('idle', () => logger.debug('[idle]'))
+      .on('busy', () => logger.debug('[busy]'))
+      .on('exit', (code) => logger.debug('[exit]', code))
       .on('stdout', (data) => process.stdout.write(data))
-      .on('stderr', (data) => process.stderr.write(data));
-    // .on('output', (data) => process.stdout.write(data));
+      .on('stderr', (data) => process.stderr.write(data))
+      .on('output', (data) => logger.debug('[output]', data));
   }
 
   async run(
@@ -274,7 +275,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
         });
         this.once('exit', () => reject(new Error('Process exited')));
         signal.onabort = () => {
-          console.log('Aborting command');
+          logger.info('Aborting command');
           this.destroy();
           reject(new Error('Command aborted'));
         };
@@ -284,7 +285,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
           case 'exit':
             return reject(new Error('Process exited'));
         }
-        console.log('Waiting for cli to become available');
+        logger.info('Waiting for cli to become available');
       }).catch((err) => {
         throw err;
       });
@@ -294,7 +295,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
     return new Promise<{ fullOutput: string; events: MarkdownParserEvent[] }>(
       (resolve, reject) => {
         signal.onabort = () => {
-          console.log('Aborting command');
+          logger.info('Aborting command');
           this.destroy();
           reject(new Error('Command aborted'));
         };
