@@ -6,8 +6,22 @@ import pkg from '../../package.json';
 
 let userId = '';
 let machineId = '';
+let isAnalyticsEnabled = false; // 👈 dynamic runtime flag
 
 const analytics = new Analytics('dnhLCaCxKyJhOqOgXmAyHzcbPrfsB09e');
+const ddClientToken = 'pub24e93578176f1a88e1da4ef7bf77eb50';
+
+function omit<R extends Record<string | number | symbol, unknown>>(
+  obj: R,
+  keys: Array<keyof R>,
+): Omit<R, keyof typeof keys> {
+  const result = { ...obj };
+  for (const key of keys) {
+    delete result[key];
+  }
+  return result as Omit<R, keyof typeof keys>;
+}
+
 export const logger = createLogger({
   level: 'debug',
   transports: [
@@ -46,29 +60,14 @@ export const logger = createLogger({
   ],
 });
 
-function omit<R extends Record<string | number | symbol, unknown>>(
-  obj: R,
-  keys: Array<keyof R>,
-): Omit<R, keyof typeof keys> {
-  const result = { ...obj };
-  for (const key of keys) {
-    delete result[key];
-  }
-  return result as Omit<R, keyof typeof keys>;
-}
-
 export function init(context: vscode.ExtensionContext, env: Env) {
-  const ddClientToken = 'pub24e93578176f1a88e1da4ef7bf77eb50';
-
   if (env !== 'development') {
     logger.level = 'info';
   }
 
-  if (!machineId) {
-    machineId = context.globalState.get('machineId') ?? crypto.randomUUID();
-    userId = (context.globalState.get('userId') ?? '') as string;
-    context.globalState.update('machineId', machineId);
-  }
+  machineId = context.globalState.get('machineId') ?? crypto.randomUUID();
+  userId = (context.globalState.get('userId') ?? '') as string;
+  context.globalState.update('machineId', machineId);
 
   logger.defaultMeta = {
     env,
@@ -77,14 +76,31 @@ export function init(context: vscode.ExtensionContext, env: Env) {
     machineId,
   };
 
-  logger.add(
-    new transports.Http({
-      host: 'http-intake.logs.datadoghq.com',
-      path: `/api/v2/logs?dd-api-key=${ddClientToken}`,
-      ssl: true,
-      format: format.json(),
-    }),
-  );
+  const consent = context.globalState.get<string>('testdriver.analyticsConsent');
+  setAnalyticsConsent(consent === 'granted'); // 👈 configure based on saved consent
+}
+
+export function setAnalyticsConsent(enabled: boolean) {
+  isAnalyticsEnabled = enabled;
+
+  // Dynamically add Datadog transport
+  const existing = logger.transports.find(t => t instanceof transports.Http);
+  if (enabled && !existing) {
+    logger.add(
+      new transports.Http({
+        host: 'http-intake.logs.datadoghq.com',
+        path: `/api/v2/logs?dd-api-key=${ddClientToken}`,
+        ssl: true,
+        format: format.json(),
+      }),
+    );
+    logger.info('Analytics enabled');
+  }
+
+  if (!enabled && existing) {
+    logger.remove(existing);
+    logger.info('Analytics disabled');
+  }
 }
 
 export const setUser = (id: string | null) => {
@@ -104,6 +120,9 @@ export const track = (payload: {
   context?: Record<string, unknown>;
 }) => {
   logger.info(payload.event, payload.properties);
+
+  if (!isAnalyticsEnabled) return;
+
   return analytics.track({
     ...(userId ? { userId } : { anonymousId: machineId }),
     ...payload,

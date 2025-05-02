@@ -302,6 +302,10 @@
     "languageModelTools": [],
     "commands": [
       {
+        "command": "testdriver.toggleAnalytics",
+        "title": "TestDriver: Toggle Analytics"
+      },
+      {
         "command": "testdriver.walkthrough",
         "title": "TestDriver: Start Setup Walkthrough"
       },
@@ -344,9 +348,6 @@
     "watch": "tsc -watch",
     "build": "tsc && vsce package"
   },
-  "extensionDependencies": [
-    "redhat.vscode-yaml"
-  ],
   "dependencies": {
     "ajv": "^8.17.1",
     "analytics-node": "^6.2.0",
