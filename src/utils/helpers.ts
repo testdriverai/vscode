@@ -2,6 +2,7 @@ import path from 'node:path';
 import * as vscode from 'vscode';
 import { exec } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { logger } from './logger';
 
 export function run(command: string, { cwd }: { cwd?: string } = {}) {
   return new Promise<{ stdout: string; stderr: string; error: Error | null }>(
@@ -66,7 +67,7 @@ export const getActiveWorkspaceFolder = () => {
     return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
   });
 
-  console.log('Matching workspace:', matchingWorkspace);
+  logger.info('Matching workspace:', matchingWorkspace);
 
   return matchingWorkspace ?? workspaces[0];
 };

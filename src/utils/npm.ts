@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { logger } from './logger';
 
 function getExecutablePath(): string {
   try {
@@ -39,7 +40,7 @@ function getPackageJsonVersion(): string {
 
     return currentVersion;
   } catch (err: any) {
-    console.error('Error:', err.message);
+    logger.error('Error:', err.message);
     process.exit(1);
   }
 }
@@ -68,7 +69,7 @@ function getPackagePath(): string {
     } else {
       throw new Error('testdriverai package not found in global npm root.');
     }
-  } catch (err) {
+  } catch {
     throw new Error('Failed to resolve global npm root.');
   }
 }
