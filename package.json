@@ -28,6 +28,12 @@
     "workspaceContains:testdriver/**"
   ],
   "contributes": {
+    "yamlValidation": [
+      {
+        "fileMatch": "**/testdriver/*.{yml,yaml}",
+        "url": "https://raw.githubusercontent.com/testdriverai/testdriverai/v5/schema.json"
+      }
+    ],
     "walkthroughs": [
       {
         "id": "gettingStarted",
@@ -338,6 +344,9 @@
     "watch": "tsc -watch",
     "build": "tsc && vsce package"
   },
+  "extensionDependencies": [
+    "redhat.vscode-yaml"
+  ],
   "dependencies": {
     "ajv": "^8.17.1",
     "arktype": "^2.1.19",
