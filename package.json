@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/Microsoft/vscode-extension-samples"
   },
-  "version": "0.2.1",
+  "version": "0.2.2",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -330,7 +330,7 @@
         "title": "TestDriver: Generate test steps, but don't run them."
       },
       {
-        "command": "testdriver.try",
+        "command": "testdriver.explore",
         "title": "TestDriver: Generate test steps, and run them."
       },
       {
