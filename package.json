@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/Microsoft/vscode-extension-samples"
   },
-  "version": "0.2.0",
+  "version": "0.2.1",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -270,7 +270,7 @@
         "commands": [
           {
             "name": "dry",
-            "description": "Generate TestDriver steps using a desktop screenshot",
+            "description": "Generate TestDriver steps using a desktop screenshots",
             "disambiguation": [
               {
                 "category": "exec",
@@ -283,8 +283,8 @@
             ]
           },
           {
-            "name": "try",
-            "description": "Generate TestDriver steps using a desktop screenshot",
+            "name": "explore",
+            "description": "Generate and Run TestDriver steps using a desktop screenshots",
             "disambiguation": [
               {
                 "category": "exec",
