@@ -125,17 +125,19 @@ export class TDInstance extends EventEmitter<EventsMap> {
     const jsPath = getJSPath();
     const nodeExePath = getNodePath();
 
+    const environmentvars = {
+        ...process.env,
+        ...this.env,
+        TD_OVERLAY_ID: this.overlayId,
+        FORCE_COLOR: 'true', // Enable color rendering
+      };
+
     this.process = fork(jsPath, args, {
       cwd: this.cwd,
       stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
       execPath: nodeExePath,
       execArgv: [], // This is key - remove any problematic Node.js flags
-      env: {
-        ...process.env,
-        ...this.env,
-        TD_OVERLAY_ID: this.overlayId,
-        FORCE_COLOR: 'true', // Enable color rendering
-      },
+      env: environmentvars
     });
 
     // log all the output to a new vscode output channel called testdriver.ai and remove ansi codes

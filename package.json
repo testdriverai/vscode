@@ -28,33 +28,6 @@
     "workspaceContains:testdriver/**"
   ],
   "contributes": {
-    "contributes": {
-    "languageModelTools": [
-        {
-            "name": "chat-tools-sample_tabCount",
-            "tags": [
-                "editors",
-                "chat-tools-sample"
-            ],
-            "toolReferenceName": "tabCount",
-            "displayName": "Tab Count",
-            "modelDescription": "The number of active tabs in a tab group in VS Code.",
-            "userDescription": "Count the number of active tabs in a tab group.",
-            "canBeReferencedInPrompt": true,
-            "icon": "media/icon.png",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "tabGroup": {
-                        "type": "number",
-                        "description": "The index of the tab group to check. This is optional- if not specified, the active tab group will be checked.",
-                        "default": 0
-                    }
-                }
-            }
-        }
-    ]
-},
     "yamlValidation": [
       {
         "fileMatch": "**/testdriver/*.{yml,yaml}",
