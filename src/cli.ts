@@ -14,6 +14,7 @@ import {
   compareVersions,
   getExecutablePath,
   getPackageJsonVersion,
+  getNodePath,
 } from './utils/npm';
 import { logger } from './utils/logger';
 
@@ -116,16 +117,19 @@ export class TDInstance extends EventEmitter<EventsMap> {
     logger.info('Starting testdriverai with command:', command);
     terminal.sendText(command, true);
 
-    const args: string[] = [];
+    const args: string[] = ['edit'];
     if (this.file) {
       args.push(path.join('testdriver', this.file));
     }
 
     const jsPath = getJSPath();
+    const nodeExePath = getNodePath();
 
     this.process = fork(jsPath, args, {
       cwd: this.cwd,
       stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+      execPath: nodeExePath,
+      execArgv: [], // This is key - remove any problematic Node.js flags
       env: {
         ...process.env,
         ...this.env,
