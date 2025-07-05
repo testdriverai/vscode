@@ -120,54 +120,67 @@ const setupRunProfiles = (controller: vscode.TestController) => {
       track({ event: 'test.run.canceled' });
     });
 
-    while (queue.length > 0 && !token.isCancellationRequested) {
-      const test = queue.shift()!;
-
+    // Collect all leaf test items (those without children)
+    const leafTests: vscode.TestItem[] = [];
+    const collectLeafTests = (test: vscode.TestItem) => {
       if (test.children.size === 0) {
-        run.started(test);
-        const workspaceFolder = vscode.workspace.workspaceFolders!.find((ws) =>
-          test.uri?.fsPath.startsWith(ws.uri.fsPath),
-        )!;
-
-        const relativePath = vscode.workspace.asRelativePath(test.uri!, false);
-        const abortController = new AbortController();
-        token.onCancellationRequested(() => abortController.abort());
-
-        const instance = new TDInstance(workspaceFolder.uri.fsPath, {
-          focus: false,
-        });
-        instance.on('stdout', (data) => {
-          run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
-        });
-        instance.on('stderr', (data) => {
-          run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
-        });
-
-        await instance
-          .run(`/run ${relativePath}`, {
-            signal: abortController.signal,
-          })
-          .then(() => {
-            run.passed(test);
-            track({
-              event: 'test.item.passed',
-              properties: { id: test.id, path: test.uri?.fsPath },
-            });
-          })
-          .catch((err) => {
-            run.failed(test, new vscode.TestMessage(err.message));
-            track({
-              event: 'test.item.failed',
-              properties: { id: test.id, path: test.uri?.fsPath },
-            });
-          })
-          .finally(() => instance.destroy());
-
-        logger.info(`Test ${test.id} finished`);
+        leafTests.push(test);
       } else {
-        test.children.forEach((test) => addToQueue(test));
+        test.children.forEach((child) => collectLeafTests(child));
       }
-    }
+    };
+
+    queue.forEach((test) => collectLeafTests(test));
+
+    // Run all tests in parallel
+    const testPromises = leafTests.map(async (test) => {
+      if (token.isCancellationRequested) {
+        return;
+      }
+
+      run.started(test);
+      const workspaceFolder = vscode.workspace.workspaceFolders!.find((ws) =>
+        test.uri?.fsPath.startsWith(ws.uri.fsPath),
+      )!;
+
+      const relativePath = vscode.workspace.asRelativePath(test.uri!, false);
+      const abortController = new AbortController();
+      token.onCancellationRequested(() => abortController.abort());
+
+      const instance = new TDInstance(workspaceFolder.uri.fsPath, {
+        focus: false,
+      });
+      instance.on('stdout', (data) => {
+        run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
+      });
+      instance.on('stderr', (data) => {
+        run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
+      });
+
+      try {
+        await instance.run(`/run ${relativePath}`, {
+          signal: abortController.signal,
+        });
+        run.passed(test);
+        track({
+          event: 'test.item.passed',
+          properties: { id: test.id, path: test.uri?.fsPath },
+        });
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        run.failed(test, new vscode.TestMessage(errorMessage));
+        track({
+          event: 'test.item.failed',
+          properties: { id: test.id, path: test.uri?.fsPath },
+        });
+      } finally {
+        instance.destroy();
+        logger.info(`Test ${test.id} finished`);
+      }
+    });
+
+    // Wait for all tests to complete
+    await Promise.all(testPromises);
 
     // Make sure to end the run after all tests have been executed:
     run.end();
