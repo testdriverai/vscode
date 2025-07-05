@@ -3,6 +3,19 @@ import path from 'path';
 import fs from 'fs';
 import { logger } from './logger';
 
+function getExecutablePath(): string {
+  try {
+    const resolvedPath = path.join(getPackagePath(), "index.js");
+    if (fs.existsSync(resolvedPath)) {
+      return resolvedPath;
+    } else {
+      throw new Error('Binary found but does not exist on disk.');
+    }
+  } catch {
+    throw new Error('testdriverai index.js not found');
+  }
+}
+
 function getJSPath(): string {
   const npmRoot = execSync('npm root -g', { encoding: 'utf8' }).trim();
   const jsPath = path.join(npmRoot, 'testdriverai', 'index.js');
@@ -120,4 +133,4 @@ function getNodePath(): string {
   throw new Error('Node.js executable not found');
 }
 
-export { getPackageJsonVersion, compareVersions, getPackagePath, getJSPath, getNodePath };
+export { getExecutablePath, getPackageJsonVersion, compareVersions, getPackagePath, getJSPath, getNodePath };
