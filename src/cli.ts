@@ -12,7 +12,6 @@ import {
 import {
   getJSPath,
   compareVersions,
-  getExecutablePath,
   getPackageJsonVersion,
   getNodePath,
 } from './utils/npm';
@@ -37,7 +36,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
   public env: Record<string, string> = {};
   state: 'pending' | 'idle' | 'busy' | 'exit';
   private process: ChildProcess;
-  private overlayId?: string;
   private cleanup?: () => void;
   private isLocked = false;
 
@@ -47,10 +45,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
       file,
       env,
       focus = false,
+      params = []
     }: {
       file?: string;
       env?: Record<string, string>;
       focus?: boolean;
+      params?: string[];
     } = {},
   ) {
     super();
@@ -65,31 +65,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
     this.id = `testdriverai_vscode_${process.pid}`;
     this.state = 'pending';
-
-    this.overlayId = crypto.randomUUID();
-
-    const terminal = vscode.window.createTerminal({
-      iconPath: 'media/icon.png',
-      name: `TestDriver`,
-      cwd: this.cwd,
-      env: {
-        FORCE_COLOR: 'true',
-        ...this.env,
-      },
-    });
-
-    let testdriverPath;
-    try {
-      testdriverPath = getExecutablePath();
-    } catch {
-      // display error to user
-      vscode.window.showErrorMessage(
-        '`testdriverai` executable not found in PATH. Install `testdriverai` globally using `npm install -g testdriverai@beta`',
-      );
-      throw new Error(
-        '`testdriverai` not found in PATH. Install `testdriverai` globally using `npm install -g testdriverai@beta`',
-      );
-    }
 
     const testdriverVersion = getPackageJsonVersion();
 
@@ -106,18 +81,14 @@ export class TDInstance extends EventEmitter<EventsMap> {
       logger.info(`Using testdriverai version: ${testdriverVersion}`);
     }
 
-    const isWin = process.platform === 'win32';
-    const rendererId = this.overlayId;
-    const quotedPath = `"${testdriverPath}"`;
 
-    const command = isWin
-      ? `powershell -NoProfile -Command "& node ${quotedPath} --renderer ${rendererId}"`
-      : `node ${quotedPath} --renderer ${rendererId}`;
+    let args: string[] = ['edit'];
 
-    logger.info('Starting testdriverai with command:', command);
-    terminal.sendText(command, true);
+    console.log('params are', params)
 
-    const args: string[] = ['edit'];
+    args = args.concat(params);
+
+    console.log('args are', args)
     if (this.file) {
       args.push(path.join('testdriver', this.file));
     }
@@ -128,9 +99,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
     const environmentvars = {
         ...process.env,
         ...this.env,
-        TD_OVERLAY_ID: this.overlayId,
         FORCE_COLOR: 'true', // Enable color rendering
       };
+
+      console.log('running ' + jsPath + ' with args: ' + args.join(' '));
 
     this.process = fork(jsPath, args, {
       cwd: this.cwd,

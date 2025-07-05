@@ -149,7 +149,9 @@ const setupRunProfiles = (controller: vscode.TestController) => {
 
       const instance = new TDInstance(workspaceFolder.uri.fsPath, {
         focus: false,
+        params: ['--new-sandbox']
       });
+
       instance.on('stdout', (data) => {
         run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
       });
