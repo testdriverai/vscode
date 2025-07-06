@@ -134,6 +134,7 @@ const setupRunProfiles = (controller: vscode.TestController) => {
 
     // Run all tests in parallel
     const testPromises = leafTests.map(async (test) => {
+
       if (token.isCancellationRequested) {
         return;
       }
@@ -147,38 +148,49 @@ const setupRunProfiles = (controller: vscode.TestController) => {
       const abortController = new AbortController();
       token.onCancellationRequested(() => abortController.abort());
 
-      const instance = new TDInstance(workspaceFolder.uri.fsPath, {
-        focus: false,
-        params: ['--new-sandbox']
-      });
+      return new Promise<void>((resolve) => {
+        try {
+          const instance = new TDInstance(workspaceFolder.uri.fsPath, {
+            focus: false,
+            params: ['run', relativePath, '--new-sandbox'],
+          });
 
-      instance.on('stdout', (data) => {
-        run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
+          instance.on('stdout', (data) => {
+            run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
+          });
+          instance.on('stderr', (data) => {
+            run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
+          });
+          instance.on('exit', (code) => {
+            if (code !== 0) {
+              run.failed(test, 'Test failed with exit code ' + code);
+              track({
+                event: 'test.item.failed',
+                properties: { id: test.id, path: test.uri?.fsPath },
+              });
+            } else {
+              run.passed(test);
+              track({
+                event: 'test.item.passed',
+                properties: { id: test.id, path: test.uri?.fsPath },
+              });
+            }
+            instance.destroy();
+            resolve();
+          });
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          logger.info(`Test error: ${errorMessage}`);
+          run.failed(test, new vscode.TestMessage(errorMessage));
+          track({
+            event: 'test.item.failed',
+            properties: { id: test.id, path: test.uri?.fsPath },
+          });
+          resolve();
+        } finally {
+          logger.info(`Test ${test.id} finished`);
+        }
       });
-      instance.on('stderr', (data) => {
-        run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
-      });
-
-      try {
-        await instance.run(`/run ${relativePath}`, {
-          signal: abortController.signal,
-        });
-        run.passed(test);
-        track({
-          event: 'test.item.passed',
-          properties: { id: test.id, path: test.uri?.fsPath },
-        });
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        run.failed(test, new vscode.TestMessage(errorMessage));
-        track({
-          event: 'test.item.failed',
-          properties: { id: test.id, path: test.uri?.fsPath },
-        });
-      } finally {
-        instance.destroy();
-        logger.info(`Test ${test.id} finished`);
-      }
     });
 
     // Wait for all tests to complete

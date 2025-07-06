@@ -45,7 +45,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
       file,
       env,
       focus = false,
-      params = []
+      params = [],
     }: {
       file?: string;
       env?: Record<string, string>;
@@ -82,13 +82,10 @@ export class TDInstance extends EventEmitter<EventsMap> {
     }
 
 
-    let args: string[] = ['edit'];
+    const args: string[] = params;
 
-    console.log('params are', params)
-
-    args = args.concat(params);
-
-    console.log('args are', args)
+    console.log('params are', params);
+    console.log('args are', args);
     if (this.file) {
       args.push(path.join('testdriver', this.file));
     }
@@ -313,12 +310,12 @@ export class TDInstance extends EventEmitter<EventsMap> {
           });
         });
 
-        this.process.send(
-          JSON.stringify({
-            event: 'input',
-            data: command,
-          }),
-        );
+    this.process.send(
+      JSON.stringify({
+        event: 'input',
+        data: command,
+      }),
+    );
       },
     )
       .then((result) => {
@@ -403,6 +400,7 @@ export const getChatInstance = async () => {
       env,
       file,
       focus: true,
+      params: ['edit'],
     });
   }
   return chatInstance;
