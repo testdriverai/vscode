@@ -68,24 +68,6 @@ export const registerCommands = () => {
       false,
     );
   });
-  vscode.commands.registerCommand('testdriver.walkthroughDeploy', () => {
-    track({ event: 'walkthrough.deploy.started' });
-
-    vscode.commands.executeCommand(
-      'workbench.action.openWalkthrough',
-      'testdriverai.testdriver#deploy',
-      false,
-    );
-  });
-  vscode.commands.registerCommand('testdriver.walkthroughGenerate', () => {
-    track({ event: 'walkthrough.generate.started' });
-
-    vscode.commands.executeCommand(
-      'workbench.action.openWalkthrough',
-      'testdriverai.testdriver#generate',
-      false,
-    );
-  });
   vscode.commands.registerCommand('testdriver.openDocsAtCI', () => {
     track({ event: 'docs.ci' });
 

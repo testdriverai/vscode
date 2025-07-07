@@ -112,152 +112,6 @@
             ]
           }
         ]
-      },
-      {
-        "id": "generate",
-        "title": "Generate tests with Self-Driving mode",
-        "description": "Automatically generate multiple tests by asking TestDriver to explore your app.",
-        "steps": [
-          {
-            "id": "terminal",
-            "title": "Open a Terminal",
-            "description": "Open a terminal window to use the TestDriver CLI\n[Open Terminal](command:workbench.action.terminal.new)",
-            "media": {
-              "image": "media/change.png",
-              "altText": "TestDriver Change"
-            },
-            "completionEvents": [
-              "onCommand:workbench.action.terminal.new"
-            ]
-          },
-          {
-            "id": "interactive",
-            "title": "Run TestDriver CLI",
-            "description": "Run the TestDriver cli in your terminal by typing `testdriverai` and pressing enter.\n[Run TestDriver CLI](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20%5Cn%22%7D)",
-            "media": {
-              "image": "media/change.png",
-              "altText": "TestDriver Change"
-            },
-            "completionEvents": [
-              "onCommand:workbench.action.terminal.sendSequence"
-            ]
-          },
-          {
-            "id": "web",
-            "title": "Run TestDriver Generate",
-            "description": "Run the TestDriver web test by typing `/generate web 5` in the terminal. TestDriver will create new test prompts in `testdriver/generate` folder.\n[Run /generate Command](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22%2Fgenerate%20web%205%5Cn%22%7D)",
-            "media": {
-              "image": "media/change.png",
-              "altText": "TestDriver Change"
-            },
-            "completionEvents": [
-              "onCommand:workbench.action.terminal.sendSequence"
-            ]
-          },
-          {
-            "id": "run",
-            "title": "Run the generated tests",
-            "description": "TestDriver will use the prompts in the test file to complete the regression test.\n[Run All Tests](command:testing.runAll)",
-            "media": {
-              "image": "media/change.png",
-              "altText": "TestDriver Change"
-            },
-            "completionEvents": [
-              "onCommand:testing.runAll"
-            ]
-          },
-          {
-            "id": "go",
-            "title": "Deploy your tests!",
-            "description": "Follow the deployment walkthrough to deploy your new tests to GitHub actions!.\n[Start Walkthrough](command:testdriver.walkthroughDeploy)",
-            "media": {
-              "image": "media/change.png",
-              "altText": "TestDriver Change"
-            },
-            "completionEvents": [
-              "onCommand:testdriver.walkthroughDeploy"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "deploy",
-        "title": "Deploy to GitHub Actions",
-        "description": "Learn how to run your tests within GitHub actions.",
-        "steps": [
-          {
-            "id": "branch",
-            "title": "Create a new branch",
-            "description": "Use `git checkout -b testdriver` to make a new branch.\n[Create Branch](command:git.branch)",
-            "media": {
-              "image": "media/github.png",
-              "altText": "TestDriver GitHub"
-            },
-            "completionEvents": [
-              "onCommand:git.branch"
-            ]
-          },
-          {
-            "id": "stage",
-            "title": "Stage your changes",
-            "description": "Stage your changes with `git add .`.\n[Stage All Changes](command:git.stageAll)",
-            "media": {
-              "image": "media/github.png",
-              "altText": "TestDriver GitHub"
-            },
-            "completionEvents": [
-              "onCommand:git.stageAll"
-            ]
-          },
-          {
-            "id": "commit",
-            "title": "Commit your changes",
-            "description": "Commit your changes with `git commit -m 'your message'`.\n[Commit Changes](command:git.commit)",
-            "media": {
-              "image": "media/github.png",
-              "altText": "TestDriver GitHub"
-            },
-            "completionEvents": [
-              "onCommand:git.commit"
-            ]
-          },
-          {
-            "id": "secrets",
-            "title": "Sync .env with GitHub secrets",
-            "description": "Run the `upload-secrets` command to set your API Key and Website  URL in GitHub secrets.\n[Run Secret Sync](command:workbench.action.terminal.sendSequence?%7B%22text%22%3A%22testdriverai%20upload-secrets%5Cn%22%7D)",
-            "media": {
-              "image": "media/github.png",
-              "altText": "TestDriver GitHub"
-            },
-            "completionEvents": [
-              "onCommand:git.branch"
-            ]
-          },
-          {
-            "id": "push",
-            "title": "Push your changes",
-            "description": "Type `git push` in terminal to upload your new test files.\n[Push Changes](command:git.push)",
-            "media": {
-              "image": "media/github.png",
-              "altText": "TestDriver GitHub"
-            },
-            "completionEvents": [
-              "onCommand:git.push"
-            ]
-          },
-          {
-            "id": "docs",
-            "title": "Watch your test runs!",
-            "description": "Your test will now run everyday and on new pull requests.\n[Learn More](command:testdriver.openDocsAtCI)",
-            "media": {
-              "image": "media/github.png",
-              "altText": "TestDriver GitHub"
-            },
-            "completionEvents": [
-              "onCommand:workbench.action.openUrl"
-            ]
-          }
-        ]
       }
     ],
     "chatParticipants": [
@@ -299,23 +153,6 @@
         ]
       }
     ],
-    "languageModelTools": [{
-      "name": "testdriver",
-      "icon": "media/icon.png",
-      "canBeReferencedInPrompt": true,
-      "toolReferenceName": "testdriver",
-      "userDescription": "TestDriver is a tool that can generate and run tests for your application. You can use it to automate workflows, fill out forms, and more.",
-      "modelDescription": "TestDriver is a tool that can generate and run tests for your application. You can use it to automate workflows, fill out forms, and more. It can also be used to generate test steps using screenshots.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "paramName": {
-            "type": "string",
-            "description": "description"
-          }
-        }
-      }
-      }],
     "commands": [
       {
         "command": "testdriver.toggleAnalytics",
@@ -324,14 +161,6 @@
       {
         "command": "testdriver.walkthrough",
         "title": "TestDriver: Start Setup Walkthrough"
-      },
-      {
-        "command": "testdriver.walkthroughGenerate",
-        "title": "TestDriver: Start Test Generation Walkthrough"
-      },
-      {
-        "command": "testdriver.walkthroughDeploy",
-        "title": "TestDriver: Start Deployment Walkthrough"
       },
       {
         "command": "testdriver.init",
