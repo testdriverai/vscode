@@ -149,7 +149,7 @@ const setupRunProfiles = (controller: vscode.TestController) => {
 
       const instance = new TDInstance(workspaceFolder.uri.fsPath, {
         focus: false,
-        params: ['--new-sandbox']
+        params: ['edit', '--new-sandbox']
       });
 
       instance.on('stdout', (data) => {
