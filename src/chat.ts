@@ -1,6 +1,6 @@
 import path from 'path';
 import * as vscode from 'vscode';
-import { getChatInstance } from './cli';
+import { executeCommand, getAvailableCommands } from './agent';
 import {
   MarkdownStreamParser,
   getActiveWorkspaceFolder,
@@ -47,8 +47,10 @@ const handler: vscode.ChatRequestHandler = async (
     },
   });
   if (request.command) {
-    const commands = ['dry', 'explore'];
-    if (commands.includes(request.command)) {
+    // Get available commands from the agent
+    const availableCommands = getAvailableCommands();
+    
+    if (availableCommands.includes(request.command)) {
       const workspace = getActiveWorkspaceFolder();
       if (!workspace) {
         stream.progress('No workspace found');
@@ -69,37 +71,46 @@ const handler: vscode.ChatRequestHandler = async (
         abortController.abort();
       });
 
-      const instance = await getChatInstance();
-
-      instance.focus();
-
-      instance.on('status', (status: string) => {
-        stream.progress(status);
-      });
-
       try {
-        const { fullOutput } = await instance.run(
-          `/${request.command} ${request.prompt}`,
-          {
-            signal: abortController.signal,
-            callback: (event) => {
-              if (typeof event === 'string') {
-                stream.markdown(event);
-              } else {
-                if (['yaml', 'yml'].includes(event.type?.toLowerCase() ?? '')) {
+        let fullOutput = '';
+        
+        // Execute the command through the new agent
+        await executeCommand(
+          request.command,
+          { prompt: request.prompt },
+          {},
+          (event: { type: string; data: unknown }) => {
+            if (abortController.signal.aborted) {
+              return;
+            }
+            
+            stream.progress(`Status: ${event.type}`);
+            
+            if (event.type === 'log:markdown:static' || event.type === 'log:markdown:chunk') {
+              const content = String(event.data);
+              fullOutput += content;
+              stream.markdown(content);
+              
+              // Check if it's YAML content and add a run button
+              if (content.includes('```yaml') || content.includes('```yml')) {
+                const yamlMatch = content.match(/```ya?ml\n([\s\S]*?)\n```/);
+                if (yamlMatch) {
                   stream.button({
                     command: 'testdriver.codeblock.run',
                     title: vscode.l10n.t('Run Steps'),
-                    arguments: [event.content], // Send the YML code as an argument
+                    arguments: [yamlMatch[1]],
                   });
                 }
               }
-            },
-          },
+            } else if (event.type === 'status') {
+              stream.progress(String(event.data));
+            }
+          }
         );
+        
         return {
           metadata: {
-            isCli: true,
+            isAgent: true,
             result: fullOutput,
             prompt: request.prompt,
             history: context.history,
@@ -113,7 +124,7 @@ const handler: vscode.ChatRequestHandler = async (
             message: `Failed handling chat command "${request.command}": ${(err as Error)?.message}`,
           },
           metadata: {
-            isCli: true,
+            isAgent: true,
             prompt: request.prompt,
             command: request.command,
             history: context.history,
@@ -127,7 +138,7 @@ const handler: vscode.ChatRequestHandler = async (
           message: `Unsupported command`,
         },
         metadata: {
-          isCli: true,
+          isAgent: true,
           prompt: request.prompt,
           command: request.command,
           history: context.history,

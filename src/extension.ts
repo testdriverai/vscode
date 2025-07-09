@@ -36,7 +36,7 @@ export async function activate(context: vscode.ExtensionContext) {
   track({ event: 'extension.activated' });
   registerCommands();
   registerChatParticipant(context);
-  const controller = setupTests();
+  setupTests();
 
   try {
     registerCommands();
@@ -120,7 +120,7 @@ export async function activate(context: vscode.ExtensionContext) {
       `Analytics ${next === 'granted' ? 'enabled' : 'disabled'}.`
     );
     const env = getEnv();
-    loggerInit(context, env)
+    loggerInit(context, env);
   });
 
   context.subscriptions.push(disposable);

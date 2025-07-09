@@ -123,12 +123,26 @@
         "isSticky": true,
         "commands": [
           {
-            "name": "dry",
-            "description": "Generate TestDriver steps using a desktop screenshots",
+            "name": "run",
+            "description": "Run a test file",
             "disambiguation": [
               {
                 "category": "exec",
-                "description": "The user wants to try steps before executing them.",
+                "description": "The user wants to run a specific test file",
+                "examples": [
+                  "run my test file",
+                  "execute testdriver/test.yaml"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "explore",
+            "description": "Explore and interact with the current environment",
+            "disambiguation": [
+              {
+                "category": "exec",
+                "description": "The user wants to automate a workflow in one step",
                 "examples": [
                   "open browser and navigate to airbnb.com",
                   "fill out this form"
@@ -137,15 +151,85 @@
             ]
           },
           {
-            "name": "explore",
-            "description": "Generate and Run TestDriver steps using a desktop screenshots",
+            "name": "save",
+            "description": "Save the current test script",
             "disambiguation": [
               {
                 "category": "exec",
-                "description": "The user wants to automate a workflow in one step",
+                "description": "The user wants to save the current test script",
                 "examples": [
-                  "open browser and navigate to airbnb.com",
-                  "fill out this form"
+                  "save this test",
+                  "save to file"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "screenshot",
+            "description": "Take a screenshot of the current screen",
+            "disambiguation": [
+              {
+                "category": "exec",
+                "description": "The user wants to capture the current screen",
+                "examples": [
+                  "take a screenshot",
+                  "capture the screen"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "summarize",
+            "description": "Summarize the current test script",
+            "disambiguation": [
+              {
+                "category": "exec",
+                "description": "The user wants to get a summary of the test",
+                "examples": [
+                  "summarize this test",
+                  "give me a summary"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "history",
+            "description": "Show command history",
+            "disambiguation": [
+              {
+                "category": "exec",
+                "description": "The user wants to see the command history",
+                "examples": [
+                  "show history",
+                  "what commands have I run"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "tasks",
+            "description": "Show current tasks",
+            "disambiguation": [
+              {
+                "category": "exec",
+                "description": "The user wants to see current tasks",
+                "examples": [
+                  "show tasks",
+                  "what are my tasks"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "version",
+            "description": "Show version information",
+            "disambiguation": [
+              {
+                "category": "exec",
+                "description": "The user wants to see the version",
+                "examples": [
+                  "show version",
+                  "what version is this"
                 ]
               }
             ]

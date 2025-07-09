@@ -20,7 +20,7 @@ const getUserPrompt = async () => {
 };
 
 export const handleTDCommandInChat = async (
-  testdriverCommand: 'dry' | 'explore',
+  testdriverCommand: string,
   testdriverPrompt?: string,
 ) => {
   const options = {
@@ -39,7 +39,7 @@ export const handleTDCommandInChat = async (
   await vscode.commands.executeCommand(`${command}`, options);
 };
 
-export const testdriverCommand = (command: 'dry' | 'explore') => async () => {
+export const testdriverCommand = (command: string) => async () => {
   try {
     const prompt = await getUserPrompt();
     await handleTDCommandInChat(command, prompt);

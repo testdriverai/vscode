@@ -1,12 +1,15 @@
 import * as vscode from 'vscode';
 import { install } from './install';
 import { logger, track } from '../utils/logger';
-import { getChatInstance } from '../cli';
+import { runYaml } from '../agent';
 import { initialize } from './initialize';
 import { testdriverCommand } from './chat';
 
 const registerCtrlPCommands = () => {
-  const chatCommands = ['dry', 'explore'] as const;
+  const chatCommands = [
+    'run', 'explore', 'save', 'screenshot', 
+    'summarize', 'history', 'tasks', 'version'
+  ];
 
   for (const command of chatCommands) {
     vscode.commands.registerCommand(
@@ -32,17 +35,24 @@ const registerOtherCommands = () => {
         },
         async (progress, token) => {
           try {
-            const instance = await getChatInstance();
-
+            const abortController = new AbortController();
             token.onCancellationRequested(() => {
-              instance.destroy();
+              abortController.abort();
             });
 
-            instance.on('status', (status: string) => {
-              progress.report({ message: status });
-            });
-
-            await instance.run(`/yaml ${encodeURIComponent(yaml)}`);
+            // Use the agent to run YAML directly
+            await runYaml(
+              yaml,
+              (event: { type: string; data: unknown }) => {
+                if (abortController.signal.aborted) {
+                  return;
+                }
+                
+                if (event.type === 'status') {
+                  progress.report({ message: String(event.data) });
+                }
+              }
+            );
           } catch (err) {
             logger.error('Error running TestDriver codeblock', {
               error: err,

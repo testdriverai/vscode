@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
-import { parseDocument, isMap, isSeq, Pair, Node, Scalar, YAMLMap, YAMLSeq, Document } from 'yaml';
+import { parseDocument, isMap, isSeq, Node, Scalar, YAMLMap, YAMLSeq } from 'yaml';
 import { getPackagePath } from './npm';
 import Ajv from 'ajv';
 
 const buildPathMap = (node: Node | null, path = '', map = new Map<string, Node>()): Map<string, Node> => {
-  if (!node) return map;
+  if (!node) {
+    return map;
+  }
   map.set(path, node);
 
   if (isMap(node)) {
@@ -33,8 +35,12 @@ export function validate(context: vscode.ExtensionContext) {
   const ajv = new Ajv({ allowUnionTypes: true, allErrors: true });
 
   const validateYaml = async (document: vscode.TextDocument) => {
-    if (!document.uri.fsPath.includes('/testdriver/')) return;
-    if (document.languageId !== 'yaml') return;
+    if (!document.uri.fsPath.includes('/testdriver/')) {
+      return;
+    }
+    if (document.languageId !== 'yaml') {
+      return;
+    }
 
     const schemaPath = vscode.Uri.file(`${getPackagePath()}/schema.json`);
     const schema = JSON.parse(await vscode.workspace.fs.readFile(schemaPath).then(buffer => buffer.toString()));
@@ -55,7 +61,7 @@ export function validate(context: vscode.ExtensionContext) {
             const parentPath = error.instancePath.split('/').slice(0, -1).join('/');
             node = pathMap.get(parentPath || '');
           }
-          const cstNode = (node as any)?.cstNode;
+          const cstNode = (node as unknown as { cstNode?: { range?: [number, number] } })?.cstNode;
 
           if (cstNode?.range) {
             const [startOffset, endOffset] = cstNode.range;

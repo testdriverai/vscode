@@ -121,7 +121,9 @@ export const track = (payload: {
 }) => {
   logger.info(payload.event, payload.properties);
 
-  if (!isAnalyticsEnabled) return;
+  if (!isAnalyticsEnabled) {
+    return;
+  }
 
   return analytics.track({
     ...(userId ? { userId } : { anonymousId: machineId }),
