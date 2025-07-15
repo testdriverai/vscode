@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { TDInstance } from './cli';
 import { track, logger } from './utils/logger';
+
 import { beautifyFilename, getUri } from './utils/helpers';
 
 const FLAT = false;
@@ -89,7 +90,10 @@ const refreshTests = async (
   }
 };
 
+// Store test run flags in memory (could be persisted in globalState if needed)
+
 const setupRunProfiles = (controller: vscode.TestController, context?: vscode.ExtensionContext) => {
+
   async function runHandler(
     request: vscode.TestRunRequest,
     token: vscode.CancellationToken,
@@ -148,9 +152,12 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
 
       try {
         await new Promise<void>((resolve) => {
+          // Compose params with selected flags
+          // params removed, now using command/flags in TDInstance
           const instance = new TDInstance(workspaceFolder.uri.fsPath, {
             focus: false,
-            params: ['run', '--new-sandbox'],
+            command: 'run',
+            flags: {'new-sandbox': true},
             file: relativePath.replace('testdriver/', ''),
             context,
           });
@@ -205,6 +212,6 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
   controller.createRunProfile(
     'Run',
     vscode.TestRunProfileKind.Run,
-    (request, token) => runHandler(request, token),
+    (request, token) =>  runHandler(request, token)
   );
 };

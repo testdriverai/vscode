@@ -19,6 +19,8 @@ interface EventsMap {
   vm_url: [string];
   exit: [number | null];
   output: [string];
+  'log:log': [string];
+  error: [string];
 }
 
 export class TDInstance extends EventEmitter<EventsMap> {
@@ -34,13 +36,15 @@ export class TDInstance extends EventEmitter<EventsMap> {
     {
       file,
       env,
-      params = [],
+      command = 'edit',
+      flags = [],
       context,
     }: {
       file?: string;
       env?: Record<string, string>;
       focus?: boolean;
-      params?: string[];
+      command?: string;
+      flags?: string[];
       context?: vscode.ExtensionContext;
     } = {},
   ) {
@@ -53,7 +57,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
     }
 
     // Initialize the agent
-    this.initializeAgent(params, context).catch((err) => {
+    this.initializeAgent(command, flags, context).catch((err) => {
       console.log('Failed to initialize agent:', err);
       logger.error('Failed to initialize agent:', {
         error: err,
@@ -61,57 +65,58 @@ export class TDInstance extends EventEmitter<EventsMap> {
         stack: err?.stack,
       });
     });
-
   }
 
-  private async initializeAgent(params: string[], context?: vscode.ExtensionContext) {
-      let apiKey: string | undefined;
-    console.log('Initializing TestDriver agent with params:', params);
+  private async initializeAgent(command: string, flags: string[], context?: vscode.ExtensionContext) {
+    let apiKey: string | undefined;
+    console.log('Initializing TestDriver agent with command/flags:', command, flags);
 
+    if (context) {
+      apiKey = await context.secrets.get('TD_API_KEY');
+      console.log('Retrieved API key from secrets:', apiKey);
+    } else {
+      console.log('No context provided, API key will not be set');
+    }
+    this.agent = new TestDriverAgent();
+    this.setupEventListeners();
 
-      if (context) {
-        apiKey = await context.secrets.get('TD_API_KEY');
-        console.log('Retrieved API key from secrets:', apiKey);
-      } else {
-        console.log('No context provided, API key will not be set');
+    console.log('Setting up agent with command:', command, 'and flags:', flags);
+
+    // Set up agent properties
+    this.agent.cliArgs = {
+      command: command || 'edit',
+      args: [
+        ...(this.file ? [path.join('testdriver', this.file)] : []),
+      ],
+      options: flags,
+    };
+
+    // Set working directory
+    this.agent.workingDir = this.cwd;
+
+    // Set the file path if provided
+    if (this.file) {
+      this.agent.thisFile = this.normalizeFilePath(this.file);
+    }
+
+    // Pass API key to agent and agent config if available
+    if (apiKey) {
+      this.agent.apiKey = apiKey;
+      if (!this.agent.env) this.agent.env = {};
+      console.log('Setting API key for agent:', apiKey);
+      this.agent.env.TD_API_KEY = apiKey;
+      // Also set on agent's config object so SDK picks it up
+      try {
+        // Try to require the config from the agent package
+        const agentConfig = this.agent.config || require('testdriverai/agent/lib/config.js');
+        agentConfig.TD_API_KEY = apiKey;
+        this.agent.config = agentConfig;
+      } catch (e) {
+        console.warn('Could not set TD_API_KEY on agent config:', e);
       }
-      this.agent = new TestDriverAgent();
-      this.setupEventListeners();
-
-      // Set up agent properties
-      this.agent.cliArgs = {
-        command: params[0] || 'edit',
-        args: this.file ? [path.join('testdriver', this.file)] : [],
-        options: {},
-      };
-
-      // Set working directory
-      this.agent.workingDir = this.cwd;
-
-      // Set the file path if provided
-      if (this.file) {
-        this.agent.thisFile = this.normalizeFilePath(this.file);
-      }
-
-      // Pass API key to agent and agent config if available
-      if (apiKey) {
-        this.agent.apiKey = apiKey;
-        if (!this.agent.env) this.agent.env = {};
-        console.log('Setting API key for agent:', apiKey);
-        this.agent.env.TD_API_KEY = apiKey;
-        // Also set on agent's config object so SDK picks it up
-        try {
-          // Try to require the config from the agent package
-          const agentConfig = this.agent.config || require('testdriverai/agent/lib/config.js');
-          agentConfig.TD_API_KEY = apiKey;
-          this.agent.config = agentConfig;
-        } catch (e) {
-          console.warn('Could not set TD_API_KEY on agent config:', e);
-        }
-      }
+    }
 
     await this.agent.start();
-
   }
 
   private setupEventListeners() {

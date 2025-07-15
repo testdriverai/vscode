@@ -31,7 +31,7 @@
     "yamlValidation": [
       {
         "fileMatch": "**/testdriver/*.{yml,yaml}",
-        "url": "https://raw.githubusercontent.com/testdriverai/testdriverai/v5/schema.json"
+        "url": "https://raw.githubusercontent.com/testdriverai/testdriverai/main/schema.json"
       }
     ],
     "walkthroughs": [
@@ -40,30 +40,6 @@
         "title": "Get Started with TestDriver",
         "description": "Test your app with a computer-use agent in just a few minutes.",
         "steps": [
-          {
-            "id": "install",
-            "title": "Install TestDriver",
-            "description": "Install TestDriver via NPM.\n[npm install testdriverai -g](command:testdriver.install)",
-            "media": {
-              "image": "media/main.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testdriver.install"
-            ]
-          },
-          {
-            "id": "init",
-            "title": "Set up TestDriver workspace",
-            "description": "Run TestDriver Project Setup. Complete the setup wizard.\n[testdriverai init](command:testdriver.init)",
-            "media": {
-              "image": "media/main.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testdriver.init"
-            ]
-          },
           {
             "id": "explore",
             "title": "Create your first test",
@@ -85,30 +61,6 @@
             },
             "completionEvents": [
               "onCommand:testing.runAll"
-            ]
-          },
-          {
-            "id": "go",
-            "title": "Try \"self-driving\" mode",
-            "description": "TestDriver can automatically generate tests by looking at the screen.\n[Start Walkthrough](command:testdriver.walkthroughGenerate)",
-            "media": {
-              "image": "media/change.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testdriver.walkthroughGenerate"
-            ]
-          },
-          {
-            "id": "deploy",
-            "title": "Deploy your tests",
-            "description": "Follow the deployment walkthrough to deploy your new tests to GitHub actions!.\n[Start Walkthrough](command:testdriver.walkthroughDeploy)",
-            "media": {
-              "image": "media/github.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testdriver.walkthroughGenerate"
             ]
           }
         ]
@@ -161,26 +113,6 @@
       {
         "command": "testdriver.walkthrough",
         "title": "TestDriver: Start Setup Walkthrough"
-      },
-      {
-        "command": "testdriver.init",
-        "title": "TestDriver: Run setup in the active workspace."
-      },
-      {
-        "command": "testdriver.install",
-        "title": "TestDriver: Install TestDriver via NPM"
-      },
-      {
-        "command": "testdriver.dry",
-        "title": "TestDriver: Generate test steps, but don't run them."
-      },
-      {
-        "command": "testdriver.explore",
-        "title": "TestDriver: Generate test steps, and run them."
-      },
-      {
-        "command": "testdriver.openDocsAtCI",
-        "title": "TestDriver: Open CI Documentation"
       }
     ]
   },

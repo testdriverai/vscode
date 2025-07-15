@@ -5,7 +5,6 @@ import { init } from './utils/init';
 import { setupTests } from './tests';
 import { track, logger, init as loggerInit } from './utils/logger';
 import { getEnv } from './utils/env';
-import { validate } from './utils/schema';
 import { registerCommands } from './commands';
 import { registerChatParticipant } from './chat';
 
@@ -52,14 +51,6 @@ export async function activate(context: vscode.ExtensionContext) {
     registerChatParticipant(context);
   } catch (err) {
     logger.error('Error registering chat participant', {
-      error: err,
-    });
-  }
-
-  try {
-    validate(context);
-  } catch (err) {
-    logger.error('Error validating extension context', {
       error: err,
     });
   }
