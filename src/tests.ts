@@ -147,18 +147,31 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
       )!;
 
       const relativePath = vscode.workspace.asRelativePath(test.uri!, false);
+
+      let instance: TDInstance | undefined;
       const abortController = new AbortController();
-      token.onCancellationRequested(() => abortController.abort());
+
+      // Register cancellation handler to destroy the TDInstance
+      const cancelListener = token.onCancellationRequested(() => {
+        abortController.abort();
+        if (instance && typeof instance.destroy === 'function') {
+          try {
+            instance.destroy();
+          } catch (e) {
+            logger.error('Error destroying TDInstance on cancel', e);
+          }
+        }
+      });
 
       try {
         await new Promise<void>((resolve) => {
           // Compose params with selected flags
           // params removed, now using command/flags in TDInstance
-          const instance = new TDInstance(workspaceFolder.uri.fsPath, {
+          instance = new TDInstance(workspaceFolder.uri.fsPath, {
             focus: false,
             command: 'run',
-            flags: {'new-sandbox': true},
             file: relativePath.replace('testdriver/', ''),
+            flags: {'new-sandbox': true},
             context,
           });
 
@@ -196,6 +209,7 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
         });
       } finally {
         logger.info(`Test ${test.id} finished`);
+        cancelListener.dispose();
       }
     });
 

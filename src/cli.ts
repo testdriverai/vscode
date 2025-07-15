@@ -2,6 +2,7 @@ import path from 'path';
 import * as vscode from 'vscode';
 import EventEmitter from 'node:events';
 import { logger } from './utils/logger';
+import { openTestDriverWebview } from './utils/webview';
 
 // Import the TestDriver agent directly from the package (npm link preferred for local dev)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -121,8 +122,22 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
   private setupEventListeners() {
     this.agent.emitter.on('**', (data: any) => {
-      console.log('event', this.agent.emitter.event, JSON.stringify(data ));
-      this.emit(this.agent.emitter.event, data);
+      const eventName = this.agent.emitter.event;
+      console.log('event', eventName, JSON.stringify(data));
+      this.emit(eventName, data);
+
+      // Listen for the show-window event and open a webview
+      if (eventName === 'show-window') {
+        try {
+          const encodedData = encodeURIComponent(JSON.stringify(data));
+          const urlToOpen = this.agent.debuggerUrl
+            ? `${this.agent.debuggerUrl}?data=${encodedData}`
+            : `${data.url}?data=${encodedData}`;
+          openTestDriverWebview(urlToOpen, 'TestDriver Window');
+        } catch (err) {
+          logger.error('Failed to open TestDriver webview', { error: err });
+        }
+      }
     });
 
 
