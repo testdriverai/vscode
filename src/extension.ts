@@ -36,7 +36,9 @@ export async function activate(context: vscode.ExtensionContext) {
   track({ event: 'extension.activated' });
   registerCommands();
   registerChatParticipant(context);
-  const controller = setupTests();
+  // Pass context to setupTests so it can be used by TDInstance
+  setupTests(context);
+
 
   try {
     registerCommands();
@@ -63,7 +65,8 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   try {
-    const controller = setupTests();
+    // Pass context to setupTests so it can be used by TDInstance
+    const controller = setupTests(context);
     context.subscriptions.push(controller);
   } catch (err) {
     logger.error('Error setting up tests', {
@@ -120,8 +123,23 @@ export async function activate(context: vscode.ExtensionContext) {
       `Analytics ${next === 'granted' ? 'enabled' : 'disabled'}.`
     );
     const env = getEnv();
-    loggerInit(context, env)
+    loggerInit(context, env);
   });
 
   context.subscriptions.push(disposable);
+
+  const apiKeyDisposable = vscode.commands.registerCommand('testdriver.setApiKey', async () => {
+    const apiKey = await vscode.window.showInputBox({
+      prompt: 'Enter your TestDriver API key (from app.testdriver.ai/team)',
+      ignoreFocusOut: true,
+      password: true
+    });
+    if (apiKey) {
+      await context.secrets.store('TD_API_KEY', apiKey);
+      vscode.window.showInformationMessage('TestDriver API key saved securely.');
+    } else {
+      vscode.window.showWarningMessage('No API key entered.');
+    }
+  });
+  context.subscriptions.push(apiKeyDisposable);
 }

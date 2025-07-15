@@ -1,43 +1,35 @@
-import fs from 'fs';
 import path from 'path';
-import dotenv from 'dotenv';
 import * as vscode from 'vscode';
 import EventEmitter from 'node:events';
-import { ChildProcess, fork } from 'node:child_process';
-import {
-  MarkdownParserEvent,
-  MarkdownStreamParser,
-  getActiveWorkspaceFolder,
-} from './utils/helpers';
-import {
-  getJSPath,
-  compareVersions,
-  getPackageJsonVersion,
-  getNodePath,
-} from './utils/npm';
 import { logger } from './utils/logger';
+
+// Import the TestDriver agent directly from the package (npm link preferred for local dev)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const TestDriverAgent = require('testdriverai').Agent || require('testdriverai');
+// Import events from the agent's events.js directly for reliability
+let events;
+try {
+  events = require('testdriverai/agent/events.js').events;
+} catch (e) {
+  // fallback for npm link or direct dev usage
+  events = require('../../testdriverai/agent/events.js').events;
+}
 
 interface EventsMap {
   vm_url: [string];
-  status: [string];
-  stdout: [string];
-  stderr: [string];
   exit: [number | null];
   output: [string];
-  pending: [];
-  idle: [];
-  busy: [];
 }
 
-const MAX_RETRIES = 10;
 export class TDInstance extends EventEmitter<EventsMap> {
   id: string;
   public file?: string;
   public env: Record<string, string> = {};
-  state: 'pending' | 'idle' | 'busy' | 'exit';
-  private process: ChildProcess;
+  // No internal state management; rely on agent for state
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public agent: any;
   private cleanup?: () => void;
-  private isLocked = false;
+  private outputChannel: vscode.OutputChannel;
 
   constructor(
     public cwd: string,
@@ -46,11 +38,13 @@ export class TDInstance extends EventEmitter<EventsMap> {
       env,
       focus = false,
       params = [],
+      context,
     }: {
       file?: string;
       env?: Record<string, string>;
       focus?: boolean;
       params?: string[];
+      context?: vscode.ExtensionContext;
     } = {},
   ) {
     super();
@@ -61,273 +55,135 @@ export class TDInstance extends EventEmitter<EventsMap> {
       this.env = env;
     }
 
-    const requiredVersion = '5.3.14';
-
     this.id = `testdriverai_vscode_${process.pid}`;
-    this.state = 'pending';
 
-    const testdriverVersion = getPackageJsonVersion();
-
-    if (compareVersions(testdriverVersion, requiredVersion) <= 0) {
-      const message = `testdriverai version must be greater than ${requiredVersion}. Current version: ${testdriverVersion}`;
-      logger.error(
-        'Error: testdriverai version is too old. Please update to the latest version.',
-      );
-      vscode.window.showErrorMessage(message);
-      throw new Error(message);
-    }
-
-    if (testdriverVersion) {
-      logger.info(`Using testdriverai version: ${testdriverVersion}`);
-    }
-
-
-    const args: string[] = params;
-
-    console.log('params are', params);
-    console.log('args are', args);
-    if (this.file) {
-      args.push(path.join('testdriver', this.file));
-    }
-
-    const jsPath = getJSPath();
-    const nodeExePath = getNodePath();
-
-    const environmentvars = {
-        ...process.env,
-        ...this.env,
-        FORCE_COLOR: 'true', // Enable color rendering
-      };
-
-      console.log('running ' + jsPath + ' with args: ' + args.join(' '));
-
-    this.process = fork(jsPath, args, {
-      cwd: this.cwd,
-      stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-      execPath: nodeExePath,
-      execArgv: [], // This is key - remove any problematic Node.js flags
-      env: environmentvars
-    });
-
-    // log all the output to a new vscode output channel called testdriver.ai and remove ansi codes
-    const outputChannel = vscode.window.createOutputChannel(
+    // Create output channel
+    this.outputChannel = vscode.window.createOutputChannel(
       'TestDriver',
       'markdown',
     );
 
     if (focus) {
-      outputChannel.show();
+      this.outputChannel.show();
     }
 
-    this.process.once('error', (e) => {
-      logger.error('Error starting process', e);
-      this.state = 'exit';
-      this.emit('exit', 1);
-    });
-
-    this.process.once('exit', (code) => {
-      this.state = 'exit';
-      this.emit('exit', code);
-    });
-
-    this.process.once('spawn', async () => {
-      let retryCount = 0;
-
-      const stripAnsi = await import('strip-ansi');
-      this.process.stdout?.on('data', (data) => {
-        this.emit('stdout', data.toString());
-        const strippedData = stripAnsi.default(data.toString());
-        outputChannel.append(strippedData);
+    // Initialize the agent
+    this.initializeAgent(params, context).catch((err) => {
+      console.log('Failed to initialize agent:', err);
+      logger.error('Failed to initialize agent:', {
+        error: err,
+        message: err?.message,
+        stack: err?.stack,
       });
-
-      this.process.stderr?.on('data', (data) => {
-        this.emit('stderr', data.toString());
-        const strippedData = stripAnsi.default(data.toString());
-        outputChannel.append(strippedData);
-      });
-
-      const onConnect = () => {
-        retryCount = 0;
-        this.state = 'pending';
-        this.emit('pending');
-      };
-      const onError = () => {
-        retryCount++;
-        if (this.state === 'pending' && retryCount <= MAX_RETRIES) {
-          return;
-        }
-        this.state = 'exit';
-        this.emit('exit', 1);
-      };
-
-      const onDisconnect = () => {
-        if (this.state !== 'pending') {
-          this.state = 'exit';
-          this.emit('exit', null);
-        }
-      };
-
-      const handleMessage = (message: { event: string; data: unknown }) => {
-        let d;
-        try {
-          d = message;
-        } catch (e) {
-          logger.error('Error parsing message', e);
-          return;
-        }
-
-        switch (d.event) {
-          case 'interactive':
-            this.state = (d.data as boolean) ? 'idle' : 'busy';
-            this.emit(this.state);
-            break;
-          case 'output':
-            this.emit('output', d.data as string);
-            break;
-          case 'status':
-            this.emit('status', d.data as string);
-            break;
-          case 'show:vm':
-            this.emit('vm_url', d.data as string);
-            break;
-          case 'pending':
-            this.state = 'pending';
-            this.emit('pending');
-            break;
-          case 'idle':
-            this.state = 'idle';
-            this.emit('idle');
-            break;
-          case 'busy':
-            this.state = 'busy';
-            this.emit('busy');
-            break;
-          case 'exit':
-            this.state = 'exit';
-            this.emit('exit', d.data as number);
-            this.destroy();
-            break;
-        }
-      };
-
-      this.process
-        .on('connect', onConnect)
-        .on('error', onError)
-        .on('disconnect', onDisconnect)
-        .on('message', handleMessage);
-
-      this.cleanup = () => {
-        this.process
-          ?.off('connect', onConnect)
-          ?.off('error', onError)
-          ?.off('disconnect', onDisconnect)
-          ?.off('message', handleMessage);
-      };
     });
 
-    // Debug
-    this.on('pending', () => logger.debug('[pending]'))
-      .on('idle', () => logger.debug('[idle]'))
-      .on('busy', () => logger.debug('[busy]'))
-      .on('exit', (code) => logger.debug('[exit]', code))
-      .on('stdout', (data) => process.stdout.write(data))
-      .on('stderr', (data) => process.stderr.write(data))
-      .on('output', (data) => logger.debug('[output]', data));
   }
 
-  async run(
-    command: string,
-    options: {
-      signal?: AbortSignal;
-      callback?: (event: MarkdownParserEvent) => void;
-    } = {},
-  ) {
-    const signal = options.signal ?? new AbortController().signal;
-    do {
-      await new Promise((resolve, reject) => {
-        this.once('idle', () => {
-          resolve(true);
-        });
-        this.once('exit', () => reject(new Error('Process exited')));
-        signal.onabort = () => {
-          logger.info('Aborting command');
-          this.destroy();
-          reject(new Error('Command aborted'));
-        };
-        switch (this.state) {
-          case 'idle':
-            return resolve(true);
-          case 'exit':
-            return reject(new Error('Process exited'));
+  private async initializeAgent(params: string[], context?: vscode.ExtensionContext) {
+      let apiKey: string | undefined;
+    console.log('Initializing TestDriver agent with params:', params);
+
+
+      if (context) {
+        apiKey = await context.secrets.get('TD_API_KEY');
+        console.log('Retrieved API key from secrets:', apiKey);
+      } else {
+        console.log('No context provided, API key will not be set');
+      }
+      this.agent = new TestDriverAgent();
+      this.setupEventListeners();
+
+      // Set up agent properties
+      this.agent.cliArgs = {
+        command: params[0] || 'edit',
+        args: this.file ? [path.join('testdriver', this.file)] : [],
+        options: {},
+      };
+
+      // Set working directory
+      this.agent.workingDir = this.cwd;
+
+      // Set the file path if provided
+      if (this.file) {
+        this.agent.thisFile = this.normalizeFilePath(this.file);
+      }
+
+      // Pass API key to agent and agent config if available
+      if (apiKey) {
+        this.agent.apiKey = apiKey;
+        if (!this.agent.env) this.agent.env = {};
+        console.log('Setting API key for agent:', apiKey);
+        this.agent.env.TD_API_KEY = apiKey;
+        // Also set on agent's config object so SDK picks it up
+        try {
+          // Try to require the config from the agent package
+          const agentConfig = this.agent.config || require('testdriverai/agent/lib/config.js');
+          agentConfig.TD_API_KEY = apiKey;
+          this.agent.config = agentConfig;
+        } catch (e) {
+          console.warn('Could not set TD_API_KEY on agent config:', e);
         }
-        logger.info('Waiting for cli to become available');
-      }).catch((err) => {
-        throw err;
-      });
-    } while (this.isLocked);
+      }
 
-    this.isLocked = true;
-    return new Promise<{ fullOutput: string; events: MarkdownParserEvent[] }>(
-      (resolve, reject) => {
-        signal.onabort = () => {
-          logger.info('Aborting command');
-          this.destroy();
-          reject(new Error('Command aborted'));
-        };
-        const result: { fullOutput: string; events: MarkdownParserEvent[] } = {
-          fullOutput: '',
-          events: [],
-        };
+    await this.agent.start();
 
-        this.once('exit', (code) =>
-          code ? reject(new Error('Process exited')) : resolve(result),
-        );
-        const parser = new MarkdownStreamParser();
+  }
 
-        const handleOutput = (message: string) => {
-          result.fullOutput += message;
-          for (const char of message) {
-            parser.processChar(char);
+  private setupEventListeners() {
+    this.agent.emitter.on('**', (data: any) => {
+      console.log('event', this.agent.emitter.event, data );
+      this.emit(this.agent.emitter.event, data);
+    });
+
+    // Forward log output
+    this.agent.emitter.on('log:*', (message: string) => {
+      // log the raw message
+      this.outputChannel.append(message + '\n');
+    });
+
+    // Forward errors
+    this.agent.emitter.on('error:*', (data: any) => {
+      console.error('Agent error:', data);
+      const event = this.agent.emitter.event;
+      const errorMessage = `${event}: ${JSON.stringify(data)}`;
+      this.outputChannel.append(errorMessage + '\n');
+      this.emit('output', errorMessage);
+      // Also emit a generic error event for test runner
+      this.emit('output', errorMessage); // Only emit 'output', not 'error', to match EventsMap
+
+      if (errorMessage.includes('API KEY') || errorMessage.includes('API_KEY_MISSING_OR_INVALID')) {
+        vscode.window.showErrorMessage(
+          'TestDriver: API key missing or invalid. Please set your API key with the "TestDriver: Set API Key" command.',
+          'Set API Key'
+        ).then(selection => {
+          if (selection === 'Set API Key') {
+            vscode.commands.executeCommand('testdriver.setApiKey');
           }
-        };
-
-        parser.on('markdown', (event) => {
-          result.events.push(event);
-          options.callback?.(event);
         });
+      }
+    });
 
-        parser.on('codeblock', (event) => {
-          result.events.push(event);
-          options.callback?.(event);
-        });
+    // Forward status as output
+    this.agent.emitter.on('status', (message: string) => {
+      this.outputChannel.append(`- ${message}\n`);
+      this.emit('output', message);
+    });
 
-        this.once('busy', () => {
-          this.on('output', handleOutput);
-          this.once('idle', () => {
-            this.off('output', handleOutput);
-            parser.end();
-            resolve(result);
-          });
-        });
+    // Forward exit event
+    this.agent.emitter.on('exit', (code: number | null) => {
+      this.emit('exit', code);
+    });
+  }
 
-    this.process.send(
-      JSON.stringify({
-        event: 'input',
-        data: command,
-      }),
-    );
-      },
-    )
-      .then((result) => {
-        this.isLocked = false;
-        return result;
-      })
-      .catch((err) => {
-        this.isLocked = false;
-        this.state = 'exit';
-        this.emit('exit', 1);
-        throw err;
-      });
+  private normalizeFilePath(file: string): string {
+    if (!file) {
+      file = "testdriver/testdriver.yaml";
+    }
+    file = path.join(this.agent.workingDir, file);
+    if (!file.endsWith(".yaml") && !file.endsWith(".yml")) {
+      file += ".yaml";
+    }
+    return file;
   }
 
   async focus() {
@@ -356,52 +212,11 @@ export class TDInstance extends EventEmitter<EventsMap> {
   }
 
   destroy() {
-    this.process.stdout?.removeAllListeners();
-    this.process.stderr?.removeAllListeners();
     this.cleanup?.();
-    this.process.kill(9);
-    this.state = 'exit';
+    if (this.agent && this.agent.exit) {
+      this.agent.exit(false);
+    }
   }
 }
 
-let chatInstance: TDInstance | null = null;
-
-export const getChatInstance = async () => {
-  if (!chatInstance || chatInstance.state === 'exit') {
-    const workingDir = getActiveWorkspaceFolder()?.uri.fsPath;
-
-    let env: Record<string, string> = {};
-    if (workingDir) {
-      const envPath = path.join(workingDir, '.env');
-      if (fs.existsSync(envPath)) {
-        const file = await vscode.workspace.fs.readFile(
-          vscode.Uri.file(envPath),
-        );
-        env = dotenv.parse(file.toString());
-      }
-    }
-    const dir = path.join(workingDir ?? '', 'testdriver');
-
-    // make a testdriver folder inside
-    // the workspace directory if it doesn't exist
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    // make a testdriver.yaml file inside
-    // the testdriver folder
-    const now = new Date();
-    const formattedDate = now.toISOString().replace(/[:.]/g, '-');
-    const file = `testdriver_${formattedDate}.yaml`;
-    const testdriverYaml = path.join(dir, file);
-    fs.writeFileSync(testdriverYaml, '', { flag: 'w' });
-
-    chatInstance = new TDInstance(workingDir ?? '', {
-      env,
-      file,
-      focus: true,
-      params: ['edit'],
-    });
-  }
-  return chatInstance;
-};
+// getChatInstance and chatInstance logic can be removed if not used elsewhere

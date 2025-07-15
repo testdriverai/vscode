@@ -1,10 +1,7 @@
 import path from 'path';
 import * as vscode from 'vscode';
 import { getChatInstance } from './cli';
-import {
-  MarkdownStreamParser,
-  getActiveWorkspaceFolder,
-} from './utils/helpers';
+import { getActiveWorkspaceFolder } from './utils/helpers';
 import spec from './spec';
 import { track, logger } from './utils/logger';
 
@@ -47,8 +44,8 @@ const handler: vscode.ChatRequestHandler = async (
     },
   });
   if (request.command) {
-    const commands = ['dry', 'explore'];
-    if (commands.includes(request.command)) {
+    // Accept all agent commands, not just 'dry' and 'explore'
+    if (typeof request.command === 'string' && request.command.length > 0) {
       const workspace = getActiveWorkspaceFolder();
       if (!workspace) {
         stream.progress('No workspace found');
@@ -70,33 +67,17 @@ const handler: vscode.ChatRequestHandler = async (
       });
 
       const instance = await getChatInstance();
-
       instance.focus();
-
       instance.on('status', (status: string) => {
         stream.progress(status);
       });
-
       try {
-        const { fullOutput } = await instance.run(
+        const fullOutput = await instance.run(
           `/${request.command} ${request.prompt}`,
-          {
-            signal: abortController.signal,
-            callback: (event) => {
-              if (typeof event === 'string') {
-                stream.markdown(event);
-              } else {
-                if (['yaml', 'yml'].includes(event.type?.toLowerCase() ?? '')) {
-                  stream.button({
-                    command: 'testdriver.codeblock.run',
-                    title: vscode.l10n.t('Run Steps'),
-                    arguments: [event.content], // Send the YML code as an argument
-                  });
-                }
-              }
-            },
-          },
+          { signal: abortController.signal },
         );
+        // The agent should emit codeblock events directly; handle them in the event listeners if needed
+        stream.markdown(fullOutput);
         return {
           metadata: {
             isCli: true,
@@ -161,28 +142,11 @@ const handler: vscode.ChatRequestHandler = async (
       // send the request
       const chatResponse = await request.model.sendRequest(messages, {}, token);
 
-      const parser = new MarkdownStreamParser();
-      parser
-        .on('markdown', (event) => {
-          stream.markdown(event);
-        })
-        .on('codeblock', (event) => {
-          if (['yaml', 'yml'].includes(event.type?.toLowerCase() ?? '')) {
-            stream.button({
-              command: 'testdriver.codeblock.run',
-              title: vscode.l10n.t('Run Steps'),
-              arguments: [event.content], // Send the YML code as an argument
-            });
-          }
-        });
       let fullMessage = '';
       for await (const fragment of chatResponse.text) {
         fullMessage += fragment;
-        for (const char of fragment) {
-          parser.processChar(char);
-        }
+        stream.markdown(fragment);
       }
-      parser.end();
       return {
         metadata: {
           isCli: false,

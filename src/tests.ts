@@ -6,14 +6,13 @@ import { beautifyFilename, getUri } from './utils/helpers';
 const FLAT = false;
 const testGlobPattern = 'testdriver/**/*.{yml,yaml}';
 
-export const setupTests = () => {
+export const setupTests = (context?: vscode.ExtensionContext) => {
   const controller = vscode.tests.createTestController(
     'testdriver-test-controller',
     'TestDriver',
   );
   discoverAndWatchTests(controller);
-  setupRunProfiles(controller);
-
+  setupRunProfiles(controller, context);
   return controller;
 };
 
@@ -90,7 +89,7 @@ const refreshTests = async (
   }
 };
 
-const setupRunProfiles = (controller: vscode.TestController) => {
+const setupRunProfiles = (controller: vscode.TestController, context?: vscode.ExtensionContext) => {
   async function runHandler(
     request: vscode.TestRunRequest,
     token: vscode.CancellationToken,
@@ -147,26 +146,39 @@ const setupRunProfiles = (controller: vscode.TestController) => {
       const abortController = new AbortController();
       token.onCancellationRequested(() => abortController.abort());
 
-      const instance = new TDInstance(workspaceFolder.uri.fsPath, {
-        focus: false,
-        params: ['edit', '--new-sandbox']
-      });
-
-      instance.on('stdout', (data) => {
-        run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
-      });
-      instance.on('stderr', (data) => {
-        run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
-      });
-
       try {
-        await instance.run(`/run ${relativePath}`, {
-          signal: abortController.signal,
-        });
-        run.passed(test);
-        track({
-          event: 'test.item.passed',
-          properties: { id: test.id, path: test.uri?.fsPath },
+        await new Promise<void>((resolve) => {
+          const instance = new TDInstance(workspaceFolder.uri.fsPath, {
+            focus: false,
+            params: ['run', '--new-sandbox'],
+            file: relativePath.replace('testdriver/', ''),
+            context,
+          });
+
+          // Listen to events from the TDInstance emitter
+          instance.on('log:log', (data: string) => {
+            console.log('appending output', data);
+            run.appendOutput(data + '\r\n', undefined, test);
+          });
+          instance.on('exit', (code: number | null) => {
+            if (code !== 0) {
+              run.failed(test, new vscode.TestMessage(`Test failed with exit code ${code}`));
+              track({
+                event: 'test.item.failed',
+                properties: { id: test.id, path: test.uri?.fsPath },
+              });
+            } else {
+              track({
+                event: 'test.item.passed',
+                properties: { id: test.id, path: test.uri?.fsPath },
+              });
+              run.passed(test);
+            }
+            resolve();
+          });
+          instance.on('error', (data: string) => {
+            run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
+          });
         });
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
@@ -176,7 +188,6 @@ const setupRunProfiles = (controller: vscode.TestController) => {
           properties: { id: test.id, path: test.uri?.fsPath },
         });
       } finally {
-        instance.destroy();
         logger.info(`Test ${test.id} finished`);
       }
     });
