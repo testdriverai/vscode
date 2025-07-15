@@ -22,21 +22,18 @@ interface EventsMap {
 }
 
 export class TDInstance extends EventEmitter<EventsMap> {
-  id: string;
   public file?: string;
   public env: Record<string, string> = {};
   // No internal state management; rely on agent for state
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public agent: any;
   private cleanup?: () => void;
-  private outputChannel: vscode.OutputChannel;
 
   constructor(
     public cwd: string,
     {
       file,
       env,
-      focus = false,
       params = [],
       context,
     }: {
@@ -53,18 +50,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
     }
     if (env) {
       this.env = env;
-    }
-
-    this.id = `testdriverai_vscode_${process.pid}`;
-
-    // Create output channel
-    this.outputChannel = vscode.window.createOutputChannel(
-      'TestDriver',
-      'markdown',
-    );
-
-    if (focus) {
-      this.outputChannel.show();
     }
 
     // Initialize the agent
@@ -131,25 +116,15 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
   private setupEventListeners() {
     this.agent.emitter.on('**', (data: any) => {
-      console.log('event', this.agent.emitter.event, data );
+      console.log('event', this.agent.emitter.event, JSON.stringify(data ));
       this.emit(this.agent.emitter.event, data);
     });
 
-    // Forward log output
-    this.agent.emitter.on('log:*', (message: string) => {
-      // log the raw message
-      this.outputChannel.append(message + '\n');
-    });
 
     // Forward errors
     this.agent.emitter.on('error:*', (data: any) => {
-      console.error('Agent error:', data);
       const event = this.agent.emitter.event;
       const errorMessage = `${event}: ${JSON.stringify(data)}`;
-      this.outputChannel.append(errorMessage + '\n');
-      this.emit('output', errorMessage);
-      // Also emit a generic error event for test runner
-      this.emit('output', errorMessage); // Only emit 'output', not 'error', to match EventsMap
 
       if (errorMessage.includes('API KEY') || errorMessage.includes('API_KEY_MISSING_OR_INVALID')) {
         vscode.window.showErrorMessage(
@@ -161,17 +136,6 @@ export class TDInstance extends EventEmitter<EventsMap> {
           }
         });
       }
-    });
-
-    // Forward status as output
-    this.agent.emitter.on('status', (message: string) => {
-      this.outputChannel.append(`- ${message}\n`);
-      this.emit('output', message);
-    });
-
-    // Forward exit event
-    this.agent.emitter.on('exit', (code: number | null) => {
-      this.emit('exit', code);
     });
   }
 
@@ -218,5 +182,3 @@ export class TDInstance extends EventEmitter<EventsMap> {
     }
   }
 }
-
-// getChatInstance and chatInstance logic can be removed if not used elsewhere
