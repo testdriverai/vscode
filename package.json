@@ -62,6 +62,14 @@
       {
         "command": "testdriver.walkthrough",
         "title": "TestDriver: Start Setup Walkthrough"
+      },
+      {
+        "command": "testdriver.addMcpServer",
+        "title": "TestDriver: Add MCP Server"
+      },
+      {
+        "command": "testdriver.runTest",
+        "title": "TestDriver: Run Test"
       }
     ]
   },

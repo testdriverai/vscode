@@ -5,7 +5,8 @@ import { init } from './utils/init';
 import { setupTests } from './tests';
 import { track, logger, init as loggerInit } from './utils/logger';
 import { getEnv } from './utils/env';
-import { registerCommands } from './commands';
+import { registerCommands, registerTestdriverRunTest } from './commands';
+
 
 export function deactivate() {}
 
@@ -28,32 +29,24 @@ export async function activate(context: vscode.ExtensionContext) {
       'testdriverai.testdriver#gettingStarted',
       false,
     );
+    // Prompt user to install MCP server for 'testdriver' key
+    vscode.window.showInformationMessage(
+      'Would you like to install an MCP server for your TestDriver project? This will connect your documentation to AI applications.',
+      'Install MCP Server'
+    ).then(selection => {
+      if (selection === 'Install MCP Server') {
+        vscode.commands.executeCommand('testdriver.addMcpServer');
+      }
+    });
     context.globalState.update('testdriver.firstInstall', false);
   }
 
   track({ event: 'extension.activated' });
   registerCommands();
-  // Pass context to setupTests so it can be used by TDInstance
-  setupTests(context);
-
-
-  try {
-    registerCommands();
-  } catch (err) {
-    logger.error('Error registering commands', {
-      error: err,
-    });
-  }
-
-  try {
-    // Pass context to setupTests so it can be used by TDInstance
-    const controller = setupTests(context);
-    context.subscriptions.push(controller);
-  } catch (err) {
-    logger.error('Error setting up tests', {
-      error: err,
-    });
-  }
+  registerTestdriverRunTest(context);
+  // Only call setupTests(context) once to initialize the shared controller
+  const controller = setupTests(context);
+  context.subscriptions.push(controller);
 
   vscode.workspace.onDidOpenTextDocument((doc) => {
     const isYaml = doc.languageId === 'yaml' || doc.fileName.endsWith('.yaml');
@@ -123,4 +116,12 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   });
   context.subscriptions.push(apiKeyDisposable);
+
+  const addMcpServerDisposable = vscode.commands.registerCommand('testdriver.addMcpServer', async () => {
+    const terminal = vscode.window.createTerminal({ name: 'MCP Server Install' });
+    terminal.show();
+    terminal.sendText('npx mint-mcp add testdriver', true);
+    vscode.window.showInformationMessage('Installing MCP server for: testdriver');
+  });
+  context.subscriptions.push(addMcpServerDisposable);
 }
