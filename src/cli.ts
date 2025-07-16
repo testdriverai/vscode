@@ -126,7 +126,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
           const urlToOpen = this.agent.debuggerUrl
             ? `${this.agent.debuggerUrl}?data=${encodedData}`
             : `${data.url}?data=${encodedData}`;
-          openTestDriverWebview(urlToOpen, 'TestDriver Window');
+          openTestDriverWebview(urlToOpen, 'TestDriver');
         } catch (err) {
           logger.error('Failed to open TestDriver webview', { error: err });
         }

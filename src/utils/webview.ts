@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-export function openTestDriverWebview(url: string, title = 'TestDriver Window') {
+export function openTestDriverWebview(url: string, title = 'TestDriver') {
   const panel = vscode.window.createWebviewPanel(
     'testdriverWebview',
     title,
