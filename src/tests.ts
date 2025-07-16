@@ -171,7 +171,6 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
             focus: false,
             command: 'run',
             file: relativePath.replace('testdriver/', ''),
-            flags: {'new-sandbox': true},
             context,
           });
 

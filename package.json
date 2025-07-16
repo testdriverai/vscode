@@ -50,57 +50,6 @@
             "completionEvents": [
               "onCommand:testdriver.explore"
             ]
-          },
-          {
-            "id": "run",
-            "title": "Run your test",
-            "description": "Run your generated test in the Test Explorer panel.\n[Run All Tests](command:testing.runAll)",
-            "media": {
-              "image": "media/run.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testing.runAll"
-            ]
-          }
-        ]
-      }
-    ],
-    "chatParticipants": [
-      {
-        "id": "testdriver.driver",
-        "fullName": "TestDriver",
-        "name": "testdriver",
-        "description": "What can I test for you?",
-        "isSticky": true,
-        "commands": [
-          {
-            "name": "dry",
-            "description": "Generate TestDriver steps using a desktop screenshots",
-            "disambiguation": [
-              {
-                "category": "exec",
-                "description": "The user wants to try steps before executing them.",
-                "examples": [
-                  "open browser and navigate to airbnb.com",
-                  "fill out this form"
-                ]
-              }
-            ]
-          },
-          {
-            "name": "explore",
-            "description": "Generate and Run TestDriver steps using a desktop screenshots",
-            "disambiguation": [
-              {
-                "category": "exec",
-                "description": "The user wants to automate a workflow in one step",
-                "examples": [
-                  "open browser and navigate to airbnb.com",
-                  "fill out this form"
-                ]
-              }
-            ]
           }
         ]
       }

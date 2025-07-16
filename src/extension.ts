@@ -6,7 +6,6 @@ import { setupTests } from './tests';
 import { track, logger, init as loggerInit } from './utils/logger';
 import { getEnv } from './utils/env';
 import { registerCommands } from './commands';
-import { registerChatParticipant } from './chat';
 
 export function deactivate() {}
 
@@ -34,7 +33,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
   track({ event: 'extension.activated' });
   registerCommands();
-  registerChatParticipant(context);
   // Pass context to setupTests so it can be used by TDInstance
   setupTests(context);
 
@@ -43,14 +41,6 @@ export async function activate(context: vscode.ExtensionContext) {
     registerCommands();
   } catch (err) {
     logger.error('Error registering commands', {
-      error: err,
-    });
-  }
-
-  try {
-    registerChatParticipant(context);
-  } catch (err) {
-    logger.error('Error registering chat participant', {
       error: err,
     });
   }

@@ -8,13 +8,6 @@ import { openTestDriverWebview } from './utils/webview';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const TestDriverAgent = require('testdriverai').Agent || require('testdriverai');
 // Import events from the agent's events.js directly for reliability
-let events;
-try {
-  events = require('testdriverai/agent/events.js').events;
-} catch (e) {
-  // fallback for npm link or direct dev usage
-  events = require('../../testdriverai/agent/events.js').events;
-}
 
 interface EventsMap {
   vm_url: [string];
