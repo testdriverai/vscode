@@ -1,20 +1,28 @@
 import * as vscode from 'vscode';
 import { TDInstance } from './cli';
 import { track, logger } from './utils/logger';
+import { TestDiagnostics } from './utils/diagnostics';
+
 import { beautifyFilename, getUri } from './utils/helpers';
 
 const FLAT = false;
 const testGlobPattern = 'testdriver/**/*.{yml,yaml}';
 
-export const setupTests = () => {
-  const controller = vscode.tests.createTestController(
-    'testdriver-test-controller',
-    'TestDriver',
-  );
-  discoverAndWatchTests(controller);
-  setupRunProfiles(controller);
-
-  return controller;
+let sharedController: vscode.TestController | undefined;
+let sharedContext: vscode.ExtensionContext | undefined;
+export const setupTests = (context?: vscode.ExtensionContext) => {
+  if (context) {
+    sharedContext = context;
+  }
+  if (!sharedController) {
+    sharedController = vscode.tests.createTestController(
+      'testdriver-test-controller',
+      'TestDriver',
+    );
+    discoverAndWatchTests(sharedController);
+    setupRunProfiles(sharedController, sharedContext);
+  }
+  return sharedController;
 };
 
 const discoverAndWatchTests = async (controller: vscode.TestController) => {
@@ -90,7 +98,10 @@ const refreshTests = async (
   }
 };
 
-const setupRunProfiles = (controller: vscode.TestController) => {
+// Store test run flags in memory (could be persisted in globalState if needed)
+
+const setupRunProfiles = (controller: vscode.TestController, context?: vscode.ExtensionContext) => {
+
   async function runHandler(
     request: vscode.TestRunRequest,
     token: vscode.CancellationToken,
@@ -134,6 +145,7 @@ const setupRunProfiles = (controller: vscode.TestController) => {
 
     // Run all tests in parallel
     const testPromises = leafTests.map(async (test) => {
+
       if (token.isCancellationRequested) {
         return;
       }
@@ -144,40 +156,138 @@ const setupRunProfiles = (controller: vscode.TestController) => {
       )!;
 
       const relativePath = vscode.workspace.asRelativePath(test.uri!, false);
+
+      let instance: TDInstance | undefined;
       const abortController = new AbortController();
-      token.onCancellationRequested(() => abortController.abort());
+      let testKilledByUser = false;
 
-      const instance = new TDInstance(workspaceFolder.uri.fsPath, {
-        focus: false,
-        params: ['edit', '--new-sandbox']
+      // Register cancellation handler to destroy the TDInstance and fail the test
+      const cancelListener = token.onCancellationRequested(() => {
+        abortController.abort();
+        testKilledByUser = true;
+        if (instance && typeof instance.destroy === 'function') {
+          try {
+            instance.destroy();
+          } catch (e) {
+            logger.error('Error destroying TDInstance on cancel', e);
+          }
+        }
+        // Mark the test as failed if killed by user
+        run.failed(test, new vscode.TestMessage('Test run was cancelled by the user.'));
+        track({
+          event: 'test.item.failed',
+          properties: { id: test.id, path: test.uri?.fsPath, reason: 'cancelled' },
+        });
       });
 
-      instance.on('stdout', (data) => {
-        run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
-      });
-      instance.on('stderr', (data) => {
-        run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
-      });
+      // Clear diagnostics for this test file before running
+      if (test.uri) {
+        TestDiagnostics.clear(test.uri);
+      }
 
       try {
-        await instance.run(`/run ${relativePath}`, {
-          signal: abortController.signal,
-        });
-        run.passed(test);
-        track({
-          event: 'test.item.passed',
-          properties: { id: test.id, path: test.uri?.fsPath },
+        await new Promise<void>((resolve) => {
+          // Compose params with selected flags
+          // params removed, now using command/flags in TDInstance
+          instance = new TDInstance(workspaceFolder.uri.fsPath, {
+            focus: false,
+            command: 'run',
+            file: relativePath,
+            context,
+          });
+
+          // Listen to events from the TDInstance emitter
+          instance.on('log:log', (data: string) => {
+            console.log('appending output', data);
+            run.appendOutput(data + '\r\n', undefined, test);
+          });
+          instance.on('exit', (code: number | null) => {
+            if (testKilledByUser) {
+              // Already marked as failed in cancel handler
+              resolve();
+              return;
+            }
+            if (code !== 0) {
+              run.failed(test, new vscode.TestMessage(`Test failed with exit code ${code}`));
+              track({
+                event: 'test.item.failed',
+                properties: { id: test.id, path: test.uri?.fsPath },
+              });
+            } else {
+              track({
+                event: 'test.item.passed',
+                properties: { id: test.id, path: test.uri?.fsPath },
+              });
+              run.passed(test);
+            }
+            resolve();
+          });
+          instance.on('error:fatal', (data: string) => {
+            run.appendOutput(data + '\r\n', undefined, test);
+
+              // Try to get error position from agent/source-mapper if available
+              let diagnostic;
+              if (instance && instance.agent && instance.agent.sourceMapper && typeof instance.agent.sourceMapper.getCurrentSourcePosition === 'function') {
+                const pos = instance.agent.sourceMapper.getCurrentSourcePosition();
+                // Prefer pos.file if available, otherwise fall back to test.uri
+                console.log('pos', pos);
+                const diagFile = (pos && pos.filePath)
+                  ? vscode.Uri.file(pos.filePath)
+                  : test.uri;
+                if (pos && diagFile) {
+                  let range;
+                  if (pos.command) {
+                    range = new vscode.Range(pos.command.startLine, pos.command.startColumn, pos.command.endLine, pos.command.endColumn);
+                  } else if (pos.step) {
+                    range = new vscode.Range(pos.step.startLine, pos.step.startColumn, pos.step.endLine, pos.step.endColumn);
+                  }
+                  if (range) {
+                    diagnostic = new vscode.Diagnostic(
+                      range,
+                      `Test failed: ${test.label}`,
+                      vscode.DiagnosticSeverity.Error
+                    );
+                    TestDiagnostics.set(diagFile, [diagnostic]);
+                  }
+                }
+              }
+          });
         });
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
+        // Try to get error position from agent/source-mapper if available
+        let diagnostic;
+        if (instance && instance.agent && instance.agent.sourceMapper && typeof instance.agent.sourceMapper.getCurrentSourcePosition === 'function') {
+          const pos = instance.agent.sourceMapper.getCurrentSourcePosition();
+          // Prefer pos.file if available, otherwise fall back to test.uri
+          const diagFile = (pos && pos.file)
+            ? vscode.Uri.file(pos.file)
+            : test.uri;
+          if (pos && diagFile) {
+            let range;
+            if (pos.command) {
+              range = new vscode.Range(pos.command.startLine, pos.command.startColumn, pos.command.endLine, pos.command.endColumn);
+            } else if (pos.step) {
+              range = new vscode.Range(pos.step.startLine, pos.step.startColumn, pos.step.endLine, pos.step.endColumn);
+            }
+            if (range) {
+              diagnostic = new vscode.Diagnostic(
+                range,
+                errorMessage,
+                vscode.DiagnosticSeverity.Error
+              );
+              TestDiagnostics.set(diagFile, [diagnostic]);
+            }
+          }
+        }
         run.failed(test, new vscode.TestMessage(errorMessage));
         track({
           event: 'test.item.failed',
           properties: { id: test.id, path: test.uri?.fsPath },
         });
       } finally {
-        instance.destroy();
         logger.info(`Test ${test.id} finished`);
+        cancelListener.dispose();
       }
     });
 
@@ -194,6 +304,6 @@ const setupRunProfiles = (controller: vscode.TestController) => {
   controller.createRunProfile(
     'Run',
     vscode.TestRunProfileKind.Run,
-    (request, token) => runHandler(request, token),
+    (request, token) =>  runHandler(request, token)
   );
 };

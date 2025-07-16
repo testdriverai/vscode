@@ -24,14 +24,13 @@
     "automation"
   ],
   "activationEvents": [
-    "onChatParticipant:testdriver.driver",
     "workspaceContains:testdriver/**"
   ],
   "contributes": {
     "yamlValidation": [
       {
         "fileMatch": "**/testdriver/*.{yml,yaml}",
-        "url": "https://raw.githubusercontent.com/testdriverai/testdriverai/v5/schema.json"
+        "url": "https://raw.githubusercontent.com/testdriverai/testdriverai/main/schema.json"
       }
     ],
     "walkthroughs": [
@@ -41,30 +40,6 @@
         "description": "Test your app with a computer-use agent in just a few minutes.",
         "steps": [
           {
-            "id": "install",
-            "title": "Install TestDriver",
-            "description": "Install TestDriver via NPM.\n[npm install testdriverai -g](command:testdriver.install)",
-            "media": {
-              "image": "media/main.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testdriver.install"
-            ]
-          },
-          {
-            "id": "init",
-            "title": "Set up TestDriver workspace",
-            "description": "Run TestDriver Project Setup. Complete the setup wizard.\n[testdriverai init](command:testdriver.init)",
-            "media": {
-              "image": "media/main.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testdriver.init"
-            ]
-          },
-          {
             "id": "explore",
             "title": "Create your first test",
             "description": "Tell TestDriver what you want to accomplish with the **/explore** command. TestDriver will generate and run commands.\n[Send a /explore](command:testdriver.explore)",
@@ -73,81 +48,6 @@
             },
             "completionEvents": [
               "onCommand:testdriver.explore"
-            ]
-          },
-          {
-            "id": "run",
-            "title": "Run your test",
-            "description": "Run your generated test in the Test Explorer panel.\n[Run All Tests](command:testing.runAll)",
-            "media": {
-              "image": "media/run.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testing.runAll"
-            ]
-          },
-          {
-            "id": "go",
-            "title": "Try \"self-driving\" mode",
-            "description": "TestDriver can automatically generate tests by looking at the screen.\n[Start Walkthrough](command:testdriver.walkthroughGenerate)",
-            "media": {
-              "image": "media/change.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testdriver.walkthroughGenerate"
-            ]
-          },
-          {
-            "id": "deploy",
-            "title": "Deploy your tests",
-            "description": "Follow the deployment walkthrough to deploy your new tests to GitHub actions!.\n[Start Walkthrough](command:testdriver.walkthroughDeploy)",
-            "media": {
-              "image": "media/github.png",
-              "altText": "TestDriver Mock"
-            },
-            "completionEvents": [
-              "onCommand:testdriver.walkthroughGenerate"
-            ]
-          }
-        ]
-      }
-    ],
-    "chatParticipants": [
-      {
-        "id": "testdriver.driver",
-        "fullName": "TestDriver",
-        "name": "testdriver",
-        "description": "What can I test for you?",
-        "isSticky": true,
-        "commands": [
-          {
-            "name": "dry",
-            "description": "Generate TestDriver steps using a desktop screenshots",
-            "disambiguation": [
-              {
-                "category": "exec",
-                "description": "The user wants to try steps before executing them.",
-                "examples": [
-                  "open browser and navigate to airbnb.com",
-                  "fill out this form"
-                ]
-              }
-            ]
-          },
-          {
-            "name": "explore",
-            "description": "Generate and Run TestDriver steps using a desktop screenshots",
-            "disambiguation": [
-              {
-                "category": "exec",
-                "description": "The user wants to automate a workflow in one step",
-                "examples": [
-                  "open browser and navigate to airbnb.com",
-                  "fill out this form"
-                ]
-              }
             ]
           }
         ]
@@ -163,24 +63,12 @@
         "title": "TestDriver: Start Setup Walkthrough"
       },
       {
-        "command": "testdriver.init",
-        "title": "TestDriver: Run setup in the active workspace."
+        "command": "testdriver.addMcpServer",
+        "title": "TestDriver: Add MCP Server"
       },
       {
-        "command": "testdriver.install",
-        "title": "TestDriver: Install TestDriver via NPM"
-      },
-      {
-        "command": "testdriver.dry",
-        "title": "TestDriver: Generate test steps, but don't run them."
-      },
-      {
-        "command": "testdriver.explore",
-        "title": "TestDriver: Generate test steps, and run them."
-      },
-      {
-        "command": "testdriver.openDocsAtCI",
-        "title": "TestDriver: Open CI Documentation"
+        "command": "testdriver.runTest",
+        "title": "TestDriver: Run Test"
       }
     ]
   },
@@ -194,24 +82,15 @@
     "build": "tsc && vsce package"
   },
   "dependencies": {
-    "ajv": "^8.17.1",
     "analytics-node": "^6.2.0",
-    "arktype": "^2.1.19",
-    "dotenv": "^16.5.0",
-    "js-yaml": "^4.1.0",
-    "js-yaml-source-map": "^0.2.2",
-    "markdown-parser": "^0.0.8",
-    "node-ipc": "^12.0.0",
-    "winston": "^3.17.0",
-    "ws": "^8.18.1",
-    "yaml": "^2.7.1"
+    "testdriverai": "^6.0.1-canary.4f31816.0",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@stylistic/eslint-plugin": "^2.9.0",
     "@types/analytics-node": "^3.1.14",
     "@types/node": "^20.17.30",
-    "@types/node-ipc": "^9.2.3",
     "@types/vscode": "^1.95.0",
     "@vscode/chat-extension-utils": "^0.0.0-alpha.1",
     "@vscode/prompt-tsx": "^0.3.0-alpha.12",

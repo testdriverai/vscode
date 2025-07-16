@@ -1,0 +1,28 @@
+{
+  "iconDefinitions": {
+    "testdriver-icon": {
+      "iconPath": "./media/icon.png"
+    }
+  },
+  "file": {
+    "testdriver-yaml": [
+      "testdriver/*.yaml",
+      "testdriver/*.yml"
+    ]
+  },
+  "fileExtensions": {
+    ".yaml": "testdriver-icon",
+    ".yml": "testdriver-icon"
+  },
+  "languageIds": {},
+  "folder": {},
+  "rootFolder": {},
+  "expandedFolder": {},
+  "collapsedFolder": {},
+  "folderNames": {},
+  "folderNamesExpanded": {},
+  "fileNames": {
+    "testdriver.yaml": "testdriver-icon",
+    "testdriver.yml": "testdriver-icon"
+  }
+}
