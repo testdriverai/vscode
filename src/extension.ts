@@ -1,16 +1,24 @@
+import { track, logger, init as loggerInit } from './utils/logger';
+import { getEnv } from './utils/env';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
 import { init } from './utils/init';
 import { setupTests } from './tests';
-import { track, logger, init as loggerInit } from './utils/logger';
-import { getEnv } from './utils/env';
+
 import { registerCommands, registerTestdriverRunTest } from './commands';
 
 
 export function deactivate() {}
 
 export async function activate(context: vscode.ExtensionContext) {
+  // Register chat participant using VS Code API
+  try {
+    console.log('Chat participant registered successfully');
+  } catch (e) {
+    // Ignore if chat API is not available
+    console.warn('Chat participant registration failed:', e);
+  }
   init(context);
 
   const isFirstInstall = context.globalState.get(

@@ -15,6 +15,7 @@ interface EventsMap {
   output: [string];
   'log:log': [string];
   error: [string];
+  'error:fatal': [string];
 }
 
 export class TDInstance extends EventEmitter<EventsMap> {
@@ -79,29 +80,28 @@ export class TDInstance extends EventEmitter<EventsMap> {
     // Set up agent properties
     this.agent.cliArgs = {
       command: command || 'edit',
-      args: [
-        ...(this.file ? [path.join('testdriver', this.file)] : []),
-      ],
+      args: [],
       options: flags,
     };
 
     // Set working directory
     this.agent.workingDir = this.cwd;
 
-    // Set the file path if provided
-    if (this.file) {
-      this.agent.thisFile = this.normalizeFilePath(this.file);
-    }
+    // Set the file path - always set one like CLI base.js does
+    this.agent.thisFile = this.normalizeFilePath(this.file);
 
     // Pass API key to agent and agent config if available
     if (apiKey) {
       this.agent.apiKey = apiKey;
-      if (!this.agent.env) this.agent.env = {};
+      if (!this.agent.env) {
+        this.agent.env = {};
+      }
       console.log('Setting API key for agent:', apiKey);
       this.agent.env.TD_API_KEY = apiKey;
       // Also set on agent's config object so SDK picks it up
       try {
         // Try to require the config from the agent package
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const agentConfig = this.agent.config || require('testdriverai/agent/lib/config.js');
         agentConfig.TD_API_KEY = apiKey;
         this.agent.config = agentConfig;
@@ -114,7 +114,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
   }
 
   private setupEventListeners() {
-    this.agent.emitter.on('**', (data: any) => {
+    this.agent.emitter.on('**', (data: unknown) => {
       const eventName = this.agent.emitter.event;
       console.log('event', eventName, JSON.stringify(data));
       this.emit(eventName, data);
@@ -125,7 +125,8 @@ export class TDInstance extends EventEmitter<EventsMap> {
           const encodedData = encodeURIComponent(JSON.stringify(data));
           const urlToOpen = this.agent.debuggerUrl
             ? `${this.agent.debuggerUrl}?data=${encodedData}`
-            : `${data.url}?data=${encodedData}`;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            : `${(data as any).url}?data=${encodedData}`;
           openTestDriverWebview(urlToOpen, 'TestDriver');
         } catch (err) {
           logger.error('Failed to open TestDriver webview', { error: err });
@@ -135,7 +136,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
 
 
     // Forward errors
-    this.agent.emitter.on('error:*', (data: any) => {
+    this.agent.emitter.on('error:*', (data: unknown) => {
       const event = this.agent.emitter.event;
       const errorMessage = `${event}: ${JSON.stringify(data)}`;
 
@@ -152,7 +153,7 @@ export class TDInstance extends EventEmitter<EventsMap> {
     });
   }
 
-  private normalizeFilePath(file: string): string {
+  private normalizeFilePath(file: string | undefined): string {
     if (!file) {
       file = "testdriver/testdriver.yaml";
     }

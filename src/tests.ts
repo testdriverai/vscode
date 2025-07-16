@@ -192,7 +192,7 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
           instance = new TDInstance(workspaceFolder.uri.fsPath, {
             focus: false,
             command: 'run',
-            file: relativePath.replace('testdriver/', ''),
+            file: relativePath,
             context,
           });
 
@@ -208,6 +208,23 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               return;
             }
             if (code !== 0) {
+              run.failed(test, new vscode.TestMessage(`Test failed with exit code ${code}`));
+              track({
+                event: 'test.item.failed',
+                properties: { id: test.id, path: test.uri?.fsPath },
+              });
+            } else {
+              track({
+                event: 'test.item.passed',
+                properties: { id: test.id, path: test.uri?.fsPath },
+              });
+              run.passed(test);
+            }
+            resolve();
+          });
+          instance.on('error:fatal', (data: string) => {
+            run.appendOutput(data + '\r\n', undefined, test);
+
               // Try to get error position from agent/source-mapper if available
               let diagnostic;
               if (instance && instance.agent && instance.agent.sourceMapper && typeof instance.agent.sourceMapper.getCurrentSourcePosition === 'function') {
@@ -234,22 +251,6 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                   }
                 }
               }
-              run.failed(test, new vscode.TestMessage(`Test failed with exit code ${code}`));
-              track({
-                event: 'test.item.failed',
-                properties: { id: test.id, path: test.uri?.fsPath },
-              });
-            } else {
-              track({
-                event: 'test.item.passed',
-                properties: { id: test.id, path: test.uri?.fsPath },
-              });
-              run.passed(test);
-            }
-            resolve();
-          });
-          instance.on('error', (data: string) => {
-            run.appendOutput(data.replace(/(?<!\r)\n/g, '\r\n'), undefined, test);
           });
         });
       } catch (err: unknown) {

@@ -24,7 +24,6 @@
     "automation"
   ],
   "activationEvents": [
-    "onChatParticipant:testdriver.driver",
     "workspaceContains:testdriver/**"
   ],
   "contributes": {
