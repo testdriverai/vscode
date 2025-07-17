@@ -67,6 +67,10 @@
         "title": "TestDriver: Add MCP Server"
       },
       {
+        "command": "testdriver.setApiKey",
+        "title": "TestDriver: Set API Key"
+      },
+      {
         "command": "testdriver.runTest",
         "title": "TestDriver: Run Test"
       }

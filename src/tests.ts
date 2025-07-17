@@ -1,9 +1,24 @@
 import * as vscode from 'vscode';
-import { TDInstance } from './cli';
+import path from 'path';
 import { track, logger } from './utils/logger';
 import { TestDiagnostics } from './utils/diagnostics';
 
 import { beautifyFilename, getUri } from './utils/helpers';
+
+// Import the TestDriver agent directly from the package
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const TestDriverAgent = require('testdriverai').Agent || require('testdriverai');
+
+function normalizeFilePath(file: string | undefined, cwd: string): string {
+  if (!file) {
+    file = "testdriver/testdriver.yaml";
+  }
+  file = path.join(cwd, file);
+  if (!file.endsWith(".yaml") && !file.endsWith(".yml")) {
+    file += ".yaml";
+  }
+  return file;
+}
 
 const FLAT = false;
 const testGlobPattern = 'testdriver/**/*.{yml,yaml}';
@@ -155,21 +170,18 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
         test.uri?.fsPath.startsWith(ws.uri.fsPath),
       )!;
 
-      const relativePath = vscode.workspace.asRelativePath(test.uri!, false);
-
-      let instance: TDInstance | undefined;
-      const abortController = new AbortController();
+      const relativePath = vscode.workspace.asRelativePath(test.uri!, false);      // Create a new agent instance for each test
+      const agent = new TestDriverAgent();
       let testKilledByUser = false;
 
-      // Register cancellation handler to destroy the TDInstance and fail the test
+      // Register cancellation handler to destroy the agent and fail the test
       const cancelListener = token.onCancellationRequested(() => {
-        abortController.abort();
         testKilledByUser = true;
-        if (instance && typeof instance.destroy === 'function') {
+        if (agent && agent.exit) {
           try {
-            instance.destroy();
+            agent.exit(false);
           } catch (e) {
-            logger.error('Error destroying TDInstance on cancel', e);
+            logger.error('Error destroying TestDriver agent on cancel', e);
           }
         }
         // Mark the test as failed if killed by user
@@ -187,50 +199,170 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
 
       try {
         await new Promise<void>((resolve) => {
-          // Compose params with selected flags
-          // params removed, now using command/flags in TDInstance
-          instance = new TDInstance(workspaceFolder.uri.fsPath, {
-            focus: false,
-            command: 'run',
-            file: relativePath,
-            context,
-          });
+          // Initialize the TestDriver agent directly
+          (async () => {
+            // Get API key from context if available
+            let apiKey: string | undefined;
+            if (context) {
+              apiKey = await context.secrets.get('TD_API_KEY');
+              console.log('Retrieved API key from secrets:', apiKey ? 'present' : 'missing');
+            } else {
+              console.log('No context available for API key retrieval');
+            }
 
-          // Listen to events from the TDInstance emitter
-          instance.on('log:log', (data: string) => {
-            console.log('appending output', data);
-            run.appendOutput(data + '\r\n', undefined, test);
-          });
-          instance.on('exit', (code: number | null) => {
-            if (testKilledByUser) {
-              // Already marked as failed in cancel handler
+            // Check if API key is missing and show popup
+            if (!apiKey) {
+              const result = await vscode.window.showErrorMessage(
+                'TestDriver: API key is required to run tests. Please set your API key.',
+                'Set API Key'
+              );
+              if (result === 'Set API Key') {
+                vscode.commands.executeCommand('testdriver.setApiKey');
+              }
+              run.failed(test, new vscode.TestMessage('Test failed: API key is required'));
+              track({
+                event: 'test.item.failed',
+                properties: { id: test.id, path: test.uri?.fsPath, reason: 'no-api-key' },
+              });
               resolve();
               return;
             }
-            if (code !== 0) {
-              run.failed(test, new vscode.TestMessage(`Test failed with exit code ${code}`));
+
+            // Set up agent properties
+            agent.cliArgs = {
+              command: 'run',
+              args: [],
+              options: [],
+            };
+
+            // Set working directory
+            agent.workingDir = workspaceFolder.uri.fsPath;
+
+            // Set the file path
+            agent.thisFile = normalizeFilePath(relativePath, workspaceFolder.uri.fsPath);
+
+            // Pass API key to agent if available
+            if (apiKey) {
+              console.log('Setting API key for test agent:', apiKey);
+
+              // Set on agent object
+              agent.apiKey = apiKey;
+
+              // Initialize and set environment
+              if (!agent.env) {
+                agent.env = {};
+              }
+              agent.env.TD_API_KEY = apiKey;
+
+              // Also set on process.env as a backup
+              process.env.TD_API_KEY = apiKey;
+
+              // Try to set on agent's config object if it exists
+              try {
+                if (agent.config) {
+                  agent.config.TD_API_KEY = apiKey;
+                  console.log('Set API key on existing agent config');
+                } else {
+                  // Try different approaches to set the config
+                  try {
+                    // eslint-disable-next-line @typescript-eslint/no-require-imports
+                    const agentConfig = require('testdriverai/agent/lib/config.js');
+                    agentConfig.TD_API_KEY = apiKey;
+                    agent.config = agentConfig;
+                    console.log('Created and set API key on agent config via require');
+                  } catch (requireError) {
+                    console.warn('Could not require config, trying direct assignment:', requireError);
+                    // Try direct assignment
+                    agent.config = { TD_API_KEY: apiKey };
+                    console.log('Set API key via direct config assignment');
+                  }
+                }
+              } catch (e) {
+                console.warn('Could not set TD_API_KEY on agent config:', e);
+                // As a last resort, try to set it directly on the agent
+                try {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (agent as any).TD_API_KEY = apiKey;
+                  console.log('Set API key directly on agent object');
+                } catch (finalError) {
+                  console.warn('All attempts to set API key failed:', finalError);
+                }
+              }
+            } else {
+              console.log('No API key available for test agent');
+            }
+
+            // Listen to events from the agent's emitter
+            agent.emitter.on('log:log', (data: string) => {
+              run.appendOutput(data.replace(/\n/g, '\r\n') + '\r\n', undefined, test);
+            });
+
+            // Add debug logging for API key related events
+            agent.emitter.on('*', (data: unknown) => {
+              const event = agent.emitter.event;
+              if (event && (event.includes('api') || event.includes('key') || event.includes('auth'))) {
+                console.log('API-related event:', event, data);
+              }
+            });
+
+            agent.emitter.on('exit', (code: number | null) => {
+
+              console.log('TestDriver agent exited with code:', code);
+
+              if (testKilledByUser) {
+                // Already marked as failed in cancel handler
+                resolve();
+                return;
+              }
+              if (code !== 0) {
+                run.failed(test, new vscode.TestMessage(`Test failed with exit code ${code}`));
+                track({
+                  event: 'test.item.failed',
+                  properties: { id: test.id, path: test.uri?.fsPath },
+                });
+              } else {
+                track({
+                  event: 'test.item.passed',
+                  properties: { id: test.id, path: test.uri?.fsPath },
+                });
+                run.passed(test);
+              }
+              resolve();
+            });
+
+            agent.emitter.on('error:*', (data: string) => {
+
+              run.appendOutput(JSON.stringify(data).replace(/\n/g, '\r\n') + '\r\n', undefined, test);
+
+              // Check for API key errors and show popup
+              const event = agent.emitter.event;
+              const errorMessage = `${event}: ${JSON.stringify(data)}`;
+
+              console.log('Error event received:', event, data);
+
+              if (errorMessage.includes('API KEY') || errorMessage.includes('API_KEY_MISSING_OR_INVALID')) {
+                vscode.window.showErrorMessage(
+                  'TestDriver: API key missing or invalid. Please set your API key with the "TestDriver: Set API Key" command.',
+                  'Set API Key'
+                ).then(selection => {
+                  if (selection === 'Set API Key') {
+                    vscode.commands.executeCommand('testdriver.setApiKey');
+                  }
+                });
+              }
+
+              run.failed(test, new vscode.TestMessage(`Test failed with error: ${JSON.stringify(data)}`));
               track({
                 event: 'test.item.failed',
                 properties: { id: test.id, path: test.uri?.fsPath },
               });
-            } else {
-              track({
-                event: 'test.item.passed',
-                properties: { id: test.id, path: test.uri?.fsPath },
-              });
-              run.passed(test);
-            }
-            resolve();
-          });
-          instance.on('error:fatal', (data: string) => {
-            run.appendOutput(data + '\r\n', undefined, test);
+              resolve();
 
               // Try to get error position from agent/source-mapper if available
               let diagnostic;
-              if (instance && instance.agent && instance.agent.sourceMapper && typeof instance.agent.sourceMapper.getCurrentSourcePosition === 'function') {
-                const pos = instance.agent.sourceMapper.getCurrentSourcePosition();
+              if (agent && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
+                const pos = agent.sourceMapper.getCurrentSourcePosition();
                 // Prefer pos.file if available, otherwise fall back to test.uri
-                console.log('pos', pos);
                 const diagFile = (pos && pos.filePath)
                   ? vscode.Uri.file(pos.filePath)
                   : test.uri;
@@ -251,17 +383,41 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                   }
                 }
               }
-          });
+            });
+
+            // Start the agent
+            console.log('Starting agent with configuration:', {
+              apiKey: agent.apiKey ? 'present' : 'missing',
+              env: agent.env,
+              config: agent.config,
+              workingDir: agent.workingDir,
+              thisFile: agent.thisFile
+            });
+            await agent.start();
+          })();
         });
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
+
+        // Check for API key errors and show popup
+        if (errorMessage.includes('API KEY') || errorMessage.includes('API_KEY_MISSING_OR_INVALID')) {
+          vscode.window.showErrorMessage(
+            'TestDriver: API key missing or invalid. Please set your API key with the "TestDriver: Set API Key" command.',
+            'Set API Key'
+          ).then(selection => {
+            if (selection === 'Set API Key') {
+              vscode.commands.executeCommand('testdriver.setApiKey');
+            }
+          });
+        }
+
         // Try to get error position from agent/source-mapper if available
         let diagnostic;
-        if (instance && instance.agent && instance.agent.sourceMapper && typeof instance.agent.sourceMapper.getCurrentSourcePosition === 'function') {
-          const pos = instance.agent.sourceMapper.getCurrentSourcePosition();
+        if (agent && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
+          const pos = agent.sourceMapper.getCurrentSourcePosition();
           // Prefer pos.file if available, otherwise fall back to test.uri
-          const diagFile = (pos && pos.file)
-            ? vscode.Uri.file(pos.file)
+          const diagFile = (pos && pos.filePath)
+            ? vscode.Uri.file(pos.filePath)
             : test.uri;
           if (pos && diagFile) {
             let range;
