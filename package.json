@@ -87,7 +87,8 @@
   },
   "dependencies": {
     "analytics-node": "^6.2.0",
-    "testdriverai": "^6.0.1-canary.4f31816.0",
+    "dotenv": "^16.4.5",
+    "testdriverai": "../testdriverai",
     "winston": "^3.17.0"
   },
   "devDependencies": {

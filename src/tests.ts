@@ -5,19 +5,35 @@ import { TestDiagnostics } from './utils/diagnostics';
 
 import { beautifyFilename, getUri } from './utils/helpers';
 
+// Import dotenv to load environment variables
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const dotenv = require('dotenv');
+
 // Import the TestDriver agent directly from the package
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const TestDriverAgent = require('testdriverai').Agent || require('testdriverai');
 
-function normalizeFilePath(file: string | undefined, cwd: string): string {
-  if (!file) {
-    file = "testdriver/testdriver.yaml";
+/**
+ * Load environment variables from the workspace .env file
+ * This ensures testdriverai gets the correct environment variables from the user's workspace
+ */
+function loadWorkspaceEnv(workspaceFolder: vscode.WorkspaceFolder): void {
+  const workspaceEnvPath = path.join(workspaceFolder.uri.fsPath, '.env');
+  try {
+    const envResult = dotenv.config({ path: workspaceEnvPath });
+    if (envResult.error) {
+      console.log('No .env file found in workspace folder or error loading it:', envResult.error.message);
+    } else {
+      console.log('Successfully loaded .env file from workspace folder');
+      // Log the TestDriver-specific environment variables that were loaded
+      const tdVars = Object.keys(process.env).filter(key => key.startsWith('TD_'));
+      if (tdVars.length > 0) {
+        console.log('TestDriver environment variables loaded:', tdVars);
+      }
+    }
+  } catch (e) {
+    console.log('Error loading .env file from workspace folder:', e);
   }
-  file = path.join(cwd, file);
-  if (!file.endsWith(".yaml") && !file.endsWith(".yml")) {
-    file += ".yaml";
-  }
-  return file;
 }
 
 const FLAT = false;
@@ -170,9 +186,10 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
         test.uri?.fsPath.startsWith(ws.uri.fsPath),
       )!;
 
-      const relativePath = vscode.workspace.asRelativePath(test.uri!, false);      // Create a new agent instance for each test
+      // Create a new agent instance for each test
       const agent = new TestDriverAgent();
       let testKilledByUser = false;
+      const originalCwd: string = process.cwd();
 
       // Register cancellation handler to destroy the agent and fail the test
       const cancelListener = token.onCancellationRequested(() => {
@@ -201,6 +218,9 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
         await new Promise<void>((resolve) => {
           // Initialize the TestDriver agent directly
           (async () => {
+            // Load .env file from workspace folder to ensure testdriverai gets the right environment variables
+            loadWorkspaceEnv(workspaceFolder);
+
             // Get API key from context if available
             let apiKey: string | undefined;
             if (context) {
@@ -208,6 +228,12 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               console.log('Retrieved API key from secrets:', apiKey ? 'present' : 'missing');
             } else {
               console.log('No context available for API key retrieval');
+            }
+
+            // If no API key from secrets, try to get it from environment variables (loaded from .env)
+            if (!apiKey && process.env.TD_API_KEY) {
+              apiKey = process.env.TD_API_KEY;
+              console.log('Retrieved API key from environment variables:', apiKey ? 'present' : 'missing');
             }
 
             // Check if API key is missing and show popup
@@ -228,18 +254,22 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               return;
             }
 
-            // Set up agent properties
-            agent.cliArgs = {
-              command: 'run',
-              args: [],
-              options: [],
-            };
+            // Change process working directory to the workspace folder containing the test file
+            process.chdir(workspaceFolder.uri.fsPath);
 
-            // Set working directory
+            // Set working directory to the workspace folder containing the test file
             agent.workingDir = workspaceFolder.uri.fsPath;
 
-            // Set the file path
-            agent.thisFile = normalizeFilePath(relativePath, workspaceFolder.uri.fsPath);
+            // Set the file path - use relative path from git root within testdriver folder
+            const relativePath = vscode.workspace.asRelativePath(test.uri!, false);
+            agent.thisFile = relativePath;
+
+            // Set up agent properties - use relative path for CLI args
+            agent.cliArgs = {
+              command: 'run',
+              args: [relativePath],
+              options: [],
+            };
 
             // Pass API key to agent if available
             if (apiKey) {
@@ -309,6 +339,9 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
 
               console.log('TestDriver agent exited with code:', code);
 
+              // Restore original working directory
+              process.chdir(originalCwd);
+
               if (testKilledByUser) {
                 // Already marked as failed in cancel handler
                 resolve();
@@ -356,6 +389,10 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                 event: 'test.item.failed',
                 properties: { id: test.id, path: test.uri?.fsPath },
               });
+
+              // Restore original working directory
+              process.chdir(originalCwd);
+
               resolve();
 
               // Try to get error position from agent/source-mapper if available
@@ -398,6 +435,9 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
         });
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
+
+        // Restore original working directory
+        process.chdir(originalCwd);
 
         // Check for API key errors and show popup
         if (errorMessage.includes('API KEY') || errorMessage.includes('API_KEY_MISSING_OR_INVALID')) {
