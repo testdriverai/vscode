@@ -487,6 +487,8 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
 
               run.appendOutput(errorMessage.replace(/\n/g, '\r\n') + '\r\n', undefined, test);
 
+
+
               // Check for API key errors and show popup
               const event = agent.emitter.event;
 
