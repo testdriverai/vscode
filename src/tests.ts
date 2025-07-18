@@ -186,8 +186,9 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
         test.uri?.fsPath.startsWith(ws.uri.fsPath),
       )!;
 
-      // Create a new agent instance for each test
-      const agent = new TestDriverAgent();
+      // Declare agent variable that will be set later
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let agent: any;
       let testKilledByUser = false;
       const originalCwd: string = process.cwd();
 
@@ -257,78 +258,82 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
             // Change process working directory to the workspace folder containing the test file
             process.chdir(workspaceFolder.uri.fsPath);
 
-            // Set working directory to the workspace folder containing the test file
-            agent.workingDir = workspaceFolder.uri.fsPath;
-
-            // Set the file path - use relative path from git root within testdriver folder
-            const relativePath = vscode.workspace.asRelativePath(test.uri!, false);
-            agent.thisFile = relativePath;
-
-            // Set up agent properties - use relative path for CLI args
-            agent.cliArgs = {
-              command: 'run',
-              args: [relativePath],
-              options: [],
+            // Prepare environment variables for the agent
+            const agentEnvironment = {
+              TD_API_KEY: apiKey,
+              ...process.env // Include other environment variables
             };
 
-            // Pass API key to agent if available
-            if (apiKey) {
-              console.log('Setting API key for test agent:', apiKey);
+            // Set working directory to the workspace folder containing the test file
+            const workingDir = workspaceFolder.uri.fsPath;
 
-              // Set on agent object
-              agent.apiKey = apiKey;
+            // Set the file path - use relative path from git root within testdriver folder
+            console.log('Test URI:', test.uri?.toString());
+            console.log('Test URI fsPath:', test.uri?.fsPath);
 
-              // Initialize and set environment
-              if (!agent.env) {
-                agent.env = {};
-              }
-              agent.env.TD_API_KEY = apiKey;
-
-              // Also set on process.env as a backup
-              process.env.TD_API_KEY = apiKey;
-
-              // Try to set on agent's config object if it exists
-              try {
-                if (agent.config) {
-                  agent.config.TD_API_KEY = apiKey;
-                  console.log('Set API key on existing agent config');
-                } else {
-                  // Try different approaches to set the config
-                  try {
-                    // eslint-disable-next-line @typescript-eslint/no-require-imports
-                    const agentConfig = require('testdriverai/agent/lib/config.js');
-                    agentConfig.TD_API_KEY = apiKey;
-                    agent.config = agentConfig;
-                    console.log('Created and set API key on agent config via require');
-                  } catch (requireError) {
-                    console.warn('Could not require config, trying direct assignment:', requireError);
-                    // Try direct assignment
-                    agent.config = { TD_API_KEY: apiKey };
-                    console.log('Set API key via direct config assignment');
-                  }
-                }
-              } catch (e) {
-                console.warn('Could not set TD_API_KEY on agent config:', e);
-                // As a last resort, try to set it directly on the agent
-                try {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (agent as any).TD_API_KEY = apiKey;
-                  console.log('Set API key directly on agent object');
-                } catch (finalError) {
-                  console.warn('All attempts to set API key failed:', finalError);
-                }
-              }
-            } else {
-              console.log('No API key available for test agent');
+            if (!test.uri) {
+              throw new Error('Test URI is undefined');
             }
 
+            const relativePath = vscode.workspace.asRelativePath(test.uri, false);
+            console.log('Relative path:', relativePath);
+
+            let finalPath: string;
+            if (!relativePath || relativePath === test.uri.fsPath) {
+              // Fallback: if asRelativePath doesn't work, manually create the relative path
+              const testPath = test.uri.fsPath;
+              const workspacePath = workspaceFolder.uri.fsPath;
+              if (testPath.startsWith(workspacePath)) {
+                const manualRelativePath = path.relative(workspacePath, testPath);
+                console.log('Using manual relative path:', manualRelativePath);
+                console.log('Manual relative path (normalized):', manualRelativePath.replace(/\\/g, '/'));
+                // Use the manual relative path, ensuring forward slashes
+                finalPath = manualRelativePath.replace(/\\/g, '/');
+              } else {
+                throw new Error(`Test file ${testPath} is not within workspace ${workspacePath}`);
+              }
+            } else {
+              finalPath = relativePath;
+            }
+
+            // Set up CLI args for the agent
+            // Based on CLI structure: npx testdriverai@latest run path/to/test.yaml
+            // The agent constructor expects CLI args that mimic the actual command line structure
+            const cliArgs = {
+              command: 'run',
+              args: [finalPath], // Include 'run' as first arg, then the file path
+              options: {
+                workingDir: workingDir
+              },
+            };
+
+            console.log('CLI args being passed to agent:', JSON.stringify(cliArgs, null, 2));
+
+            // Create agent with environment and CLI args
+            agent = new TestDriverAgent(agentEnvironment, cliArgs);
+
+            // Manually set thisFile if the agent didn't derive it correctly
+            if (!agent.thisFile && finalPath) {
+              console.log('Agent thisFile is null, manually setting to:', finalPath);
+              agent.thisFile = finalPath;
+            }
+
+            console.log('Created agent with configuration:', {
+              environment: agentEnvironment.TD_API_KEY ? 'API key present' : 'No API key',
+              workingDir: workingDir,
+              thisFile: finalPath,
+              agentThisFile: agent.thisFile,
+              agentWorkingDir: agent.workingDir,
+              agentCliArgs: agent.cliArgs
+            });
+
             // Listen to events from the agent's emitter
-            agent.emitter.on('log:log', (data: string) => {
+            agent.emitter.on('log:*', (data: string) => {
               run.appendOutput(data.replace(/\n/g, '\r\n') + '\r\n', undefined, test);
             });
 
             // Add debug logging for API key related events
-            agent.emitter.on('*', (data: unknown) => {
+            agent.emitter.on('**', (data: unknown) => {
               const event = agent.emitter.event;
               if (event && (event.includes('api') || event.includes('key') || event.includes('auth'))) {
                 console.log('API-related event:', event, data);
@@ -424,9 +429,7 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
 
             // Start the agent
             console.log('Starting agent with configuration:', {
-              apiKey: agent.apiKey ? 'present' : 'missing',
-              env: agent.env,
-              config: agent.config,
+              environment: agentEnvironment.TD_API_KEY ? 'API key present' : 'No API key',
               workingDir: agent.workingDir,
               thisFile: agent.thisFile
             });
