@@ -2,8 +2,16 @@ import * as vscode from 'vscode';
 import path from 'path';
 import { track, logger } from './utils/logger';
 import { TestDiagnostics } from './utils/diagnostics';
+import {
+  initializeDecorations,
+  disposeDecorations,
+  addCommandStatus,
+  clearCommandStatuses,
+  registerDecorationUpdates
+} from './utils/decorations';
 
 import { beautifyFilename, getUri } from './utils/helpers';
+import { openTestDriverWebview } from './utils/webview';
 
 // Import dotenv to load environment variables
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -44,6 +52,15 @@ let sharedContext: vscode.ExtensionContext | undefined;
 export const setupTests = (context?: vscode.ExtensionContext) => {
   if (context) {
     sharedContext = context;
+
+    // Initialize decorations
+    initializeDecorations(context);
+    registerDecorationUpdates();
+
+    // Dispose decorations when extension is deactivated
+    context.subscriptions.push({
+      dispose: disposeDecorations
+    });
   }
   if (!sharedController) {
     sharedController = vscode.tests.createTestController(
@@ -213,6 +230,8 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
       // Clear diagnostics for this test file before running
       if (test.uri) {
         TestDiagnostics.clear(test.uri);
+        // Clear previous command status decorations
+        clearCommandStatuses(test.uri.toString());
       }
 
       try {
@@ -332,12 +351,104 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               run.appendOutput(data.replace(/\n/g, '\r\n') + '\r\n', undefined, test);
             });
 
+            // Listen for command status events to update gutter decorations
+            agent.emitter.on('command:start', (_data: unknown) => {
+              if (test.uri && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
+                const pos = agent.sourceMapper.getCurrentSourcePosition();
+                // Prefer pos.file if available, otherwise fall back to test.uri
+                const diagFile = (pos && pos.filePath)
+                  ? vscode.Uri.file(pos.filePath)
+                  : test.uri;
+                if (pos && pos.command && diagFile) {
+                  addCommandStatus(diagFile.toString(), {
+                    line: pos.command.startLine,
+                    column: pos.command.startColumn,
+                    status: 'running',
+                    message: 'Command running...'
+                  });
+                }
+              }
+            });
+
+            agent.emitter.on('command:success', (_data: unknown) => {
+              if (test.uri && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
+                const pos = agent.sourceMapper.getCurrentSourcePosition();
+                // Prefer pos.file if available, otherwise fall back to test.uri
+                const diagFile = (pos && pos.filePath)
+                  ? vscode.Uri.file(pos.filePath)
+                  : test.uri;
+                if (pos && pos.command && diagFile) {
+                  addCommandStatus(diagFile.toString(), {
+                    line: pos.command.startLine,
+                    column: pos.command.startColumn,
+                    status: 'success',
+                    message: 'Command completed successfully'
+                  });
+                }
+              }
+            });
+
+            // Also listen for command:progress which indicates success in some cases
+            agent.emitter.on('command:progress', (data: unknown) => {
+              if (test.uri && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
+                const pos = agent.sourceMapper.getCurrentSourcePosition();
+                // Prefer pos.file if available, otherwise fall back to test.uri
+                const diagFile = (pos && pos.filePath)
+                  ? vscode.Uri.file(pos.filePath)
+                  : test.uri;
+                if (pos && pos.command && diagFile) {
+                  // Check if the progress data indicates completion/success
+                  const progressData = data as { status?: string };
+                  if (progressData && progressData.status === 'completed') {
+                    addCommandStatus(diagFile.toString(), {
+                      line: pos.command.startLine,
+                      column: pos.command.startColumn,
+                      status: 'success',
+                      message: 'Command completed successfully'
+                    });
+                  }
+                }
+              }
+            });
+
+            // Listen for command errors/failures
+            agent.emitter.on('command:failed', (data: unknown) => {
+              if (test.uri && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
+                const pos = agent.sourceMapper.getCurrentSourcePosition();
+                // Prefer pos.file if available, otherwise fall back to test.uri
+                const diagFile = (pos && pos.filePath)
+                  ? vscode.Uri.file(pos.filePath)
+                  : test.uri;
+                if (pos && pos.command && diagFile) {
+                  addCommandStatus(diagFile.toString(), {
+                    line: pos.command.startLine,
+                    column: pos.command.startColumn,
+                    status: 'failure',
+                    message: `Command failed: ${JSON.stringify(data)}`
+                  });
+                }
+              }
+            });
+
             // Add debug logging for API key related events
             agent.emitter.on('**', (data: unknown) => {
               const event = agent.emitter.event;
               if (event && (event.includes('api') || event.includes('key') || event.includes('auth'))) {
                 console.log('API-related event:', event, data);
               }
+              // Debug: log all command-related events to help identify the correct event names
+              if (event && event.startsWith('command:')) {
+                console.log('Command event:', event, data);
+              }
+            });
+
+            // Listen for show-window event to open TestDriver webview
+            agent.emitter.on('show-window', (url: string) => {
+                // Use the test file name as the webview title
+                const testFileName = test.label || 'TestDriver';
+
+                openTestDriverWebview(url, `${testFileName} - TestDriver`);
+
             });
 
             agent.emitter.on('exit', (code: number | null) => {
@@ -368,15 +479,35 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               resolve();
             });
 
-            agent.emitter.on('error:*', (data: string) => {
+            agent.emitter.on('error:*', (errorMessage: string) => {
 
-              run.appendOutput(JSON.stringify(data).replace(/\n/g, '\r\n') + '\r\n', undefined, test);
+              if (typeof errorMessage == 'object') {
+                errorMessage = JSON.stringify(errorMessage, null, 2);
+              }
+
+              run.appendOutput(errorMessage.replace(/\n/g, '\r\n') + '\r\n', undefined, test);
 
               // Check for API key errors and show popup
               const event = agent.emitter.event;
-              const errorMessage = `${event}: ${JSON.stringify(data)}`;
 
-              console.log('Error event received:', event, data);
+              console.log('Error event received:', event, errorMessage);
+
+              // Update decorations to show command failure
+              if (test.uri && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
+                const pos = agent.sourceMapper.getCurrentSourcePosition();
+                // Prefer pos.file if available, otherwise fall back to test.uri
+                const diagFile = (pos && pos.filePath)
+                  ? vscode.Uri.file(pos.filePath)
+                  : test.uri;
+                if (pos && pos.command && diagFile) {
+                  addCommandStatus(diagFile.toString(), {
+                    line: pos.command.startLine,
+                    column: pos.command.startColumn,
+                    status: 'failure',
+                    message: errorMessage
+                  });
+                }
+              }
 
               if (errorMessage.includes('API KEY') || errorMessage.includes('API_KEY_MISSING_OR_INVALID')) {
                 vscode.window.showErrorMessage(
@@ -389,7 +520,7 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                 });
               }
 
-              run.failed(test, new vscode.TestMessage(`Test failed with error: ${JSON.stringify(data)}`));
+              run.failed(test, new vscode.TestMessage(`Test failed with error: ${errorMessage}`));
               track({
                 event: 'test.item.failed',
                 properties: { id: test.id, path: test.uri?.fsPath },
@@ -418,7 +549,7 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                   if (range) {
                     diagnostic = new vscode.Diagnostic(
                       range,
-                      `Test failed: ${test.label}`,
+                      errorMessage,
                       vscode.DiagnosticSeverity.Error
                     );
                     TestDiagnostics.set(diagFile, [diagnostic]);
