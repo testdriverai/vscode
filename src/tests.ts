@@ -19,7 +19,7 @@ const dotenv = require('dotenv');
 
 // Import the TestDriver agent directly from the package
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const TestDriverAgent = require('testdriverai').Agent || require('testdriverai');
+const TestDriverAgent = require('testdriverai');
 
 /**
  * Load environment variables from the workspace .env file

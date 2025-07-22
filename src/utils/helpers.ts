@@ -47,7 +47,7 @@ export function beautifyFilename(name: string) {
     .split('/')
     .pop()!
     .replace(/\.[a-zA-Z0-9]$/, '')
-    .replace(/[_-]/g, ' ');
+    // .replace(/[_-]/g, ' ');
 }
 
 export const getActiveWorkspaceFolder = () => {
