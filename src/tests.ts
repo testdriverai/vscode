@@ -479,20 +479,13 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               resolve();
             });
 
-            agent.emitter.on('error:*', (errorMessage: string) => {
+            agent.emitter.on('error:*', async (errorMessage: string) => {
 
               if (typeof errorMessage == 'object') {
                 errorMessage = JSON.stringify(errorMessage, null, 2);
               }
 
               run.appendOutput(errorMessage.replace(/\n/g, '\r\n') + '\r\n', undefined, test);
-
-
-
-              // Check for API key errors and show popup
-              const event = agent.emitter.event;
-
-              console.log('Error event received:', event, errorMessage);
 
               // Update decorations to show command failure
               if (test.uri && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
@@ -533,9 +526,13 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
 
               resolve();
 
-              // Try to get error position from agent/source-mapper if available
-              let diagnostic;
-              if (agent && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
+                // Try to get error position from agent/source-mapper if available
+                // Strip ANSI codes from errorMessage before using it
+                const { default: stripAnsi } = await import('strip-ansi');
+                const cleanErrorMessage = stripAnsi(errorMessage);
+
+                let diagnostic;
+                if (agent && agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
                 const pos = agent.sourceMapper.getCurrentSourcePosition();
                 // Prefer pos.file if available, otherwise fall back to test.uri
                 const diagFile = (pos && pos.filePath)
@@ -544,20 +541,20 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                 if (pos && diagFile) {
                   let range;
                   if (pos.command) {
-                    range = new vscode.Range(pos.command.startLine, pos.command.startColumn, pos.command.endLine, pos.command.endColumn);
+                  range = new vscode.Range(pos.command.startLine, pos.command.startColumn, pos.command.endLine, pos.command.endColumn);
                   } else if (pos.step) {
-                    range = new vscode.Range(pos.step.startLine, pos.step.startColumn, pos.step.endLine, pos.step.endColumn);
+                  range = new vscode.Range(pos.step.startLine, pos.step.startColumn, pos.step.endLine, pos.step.endColumn);
                   }
                   if (range) {
-                    diagnostic = new vscode.Diagnostic(
-                      range,
-                      errorMessage,
-                      vscode.DiagnosticSeverity.Error
-                    );
-                    TestDiagnostics.set(diagFile, [diagnostic]);
+                  diagnostic = new vscode.Diagnostic(
+                    range,
+                    cleanErrorMessage,
+                    vscode.DiagnosticSeverity.Error
+                  );
+                  TestDiagnostics.set(diagFile, [diagnostic]);
                   }
                 }
-              }
+                }
             });
 
             // Start the agent

@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/Microsoft/vscode-extension-samples"
   },
-  "version": "0.4.2",
+  "version": "0.4.3",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -88,7 +88,8 @@
   "dependencies": {
     "analytics-node": "^6.2.0",
     "dotenv": "^16.4.5",
-    "testdriverai": "6.0.11-canary.82d380a.0",
+    "strip-ansi": "^7.1.0",
+    "testdriverai": "../testdriverai",
     "winston": "^3.17.0"
   },
   "devDependencies": {
