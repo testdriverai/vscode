@@ -89,7 +89,7 @@
     "analytics-node": "^6.2.0",
     "dotenv": "^16.4.5",
     "strip-ansi": "^7.1.0",
-    "testdriverai": "../testdriverai",
+    "testdriverai": "^6.0.11-canary.c7f8c6e.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
