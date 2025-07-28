@@ -156,6 +156,8 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
   ) {
     const run = controller.createTestRun(request);
     track({ event: 'test.run.start' });
+    let runEnded = false;
+
     const queue: vscode.TestItem[] = [];
     const addToQueue = (test: vscode.TestItem) => {
       if (request.exclude?.includes(test)) {
@@ -177,6 +179,11 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
 
     token.onCancellationRequested(() => {
       track({ event: 'test.run.canceled' });
+      // End the test run immediately when cancelled to stop the spinner
+      if (!runEnded) {
+        runEnded = true;
+        run.end();
+      }
     });
 
     // Collect all leaf test items (those without children)
@@ -211,7 +218,12 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
 
       // Register cancellation handler to destroy the agent and fail the test
       const cancelListener = token.onCancellationRequested(() => {
+
         testKilledByUser = true;
+
+        console.log(`Test run cancelled for ${test.id}`);
+        run.appendOutput(`Test run cancelled for ${test.id}\r\n`, undefined, test);
+
         if (agent && agent.exit) {
           try {
             agent.exit(false);
@@ -322,7 +334,8 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               command: 'run',
               args: [finalPath], // Include 'run' as first arg, then the file path
               options: {
-                workingDir: workingDir
+                workingDir: workingDir,
+                new: true
               },
             };
 
@@ -623,8 +636,11 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
     // Wait for all tests to complete
     await Promise.all(testPromises);
 
-    // Make sure to end the run after all tests have been executed:
-    run.end();
+    // Make sure to end the run after all tests have been executed (if not already ended due to cancellation):
+    if (!runEnded) {
+      runEnded = true;
+      run.end();
+    }
     track({
       event: 'test.run.end',
     });

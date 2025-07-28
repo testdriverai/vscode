@@ -27,6 +27,11 @@ jobs:
       - name: Build .vsix package
         run: npm run build
 
+      - name: Publish to VS Code Marketplace
+        run: vsce publish minor
+        env:
+          VSCE_PAT: ${{ secrets.VSCODE_PUBLISH_PAT }}
+
       - name: Set .vsix file path
         id: get_vsix
         run: |
