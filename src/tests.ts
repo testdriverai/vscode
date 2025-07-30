@@ -451,10 +451,8 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               if (event && (event.includes('api') || event.includes('key') || event.includes('auth'))) {
                 console.log('API-related event:', event, data);
               }
-              // Debug: log all command-related events to help identify the correct event names
-              if (event && event.startsWith('command:')) {
-                console.log('Command event:', event, data);
-              }
+              logger.info(agent.emitter.event, { data: JSON.stringify(data, null, 2)});
+
             });
 
             // Listen for show-window event to open TestDriver webview
