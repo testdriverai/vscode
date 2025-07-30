@@ -24,15 +24,17 @@ const TestDriverAgent = require('testdriverai');
 /**
  * Load environment variables from the workspace .env file
  * This ensures testdriverai gets the correct environment variables from the user's workspace
+ * Uses override: true to reload variables even if they already exist in process.env
  */
 function loadWorkspaceEnv(workspaceFolder: vscode.WorkspaceFolder): void {
   const workspaceEnvPath = path.join(workspaceFolder.uri.fsPath, '.env');
   try {
-    const envResult = dotenv.config({ path: workspaceEnvPath });
+    // Use override: true to force reload of environment variables even if they already exist
+    const envResult = dotenv.config({ path: workspaceEnvPath, override: true });
     if (envResult.error) {
       console.log('No .env file found in workspace folder or error loading it:', envResult.error.message);
     } else {
-      console.log('Successfully loaded .env file from workspace folder');
+      console.log('Successfully loaded .env file from workspace folder (with override)');
       // Log the TestDriver-specific environment variables that were loaded
       const tdVars = Object.keys(process.env).filter(key => key.startsWith('TD_'));
       if (tdVars.length > 0) {
