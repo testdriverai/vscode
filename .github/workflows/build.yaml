@@ -29,6 +29,14 @@ jobs:
       - name: Install latest testdriverai@beta
         run: npm install testdriverai@beta --save
 
+      - name: Commit package updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json
+          git commit -m "Bump version and update testdriverai@beta [skip ci]"
+          git push
+
       - name: Build .vsix package
         run: npm run build
 
