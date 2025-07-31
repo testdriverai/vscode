@@ -5,6 +5,11 @@ on:
   push:
   repository_dispatch:
     types: [cli-publish]
+
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
@@ -12,6 +17,9 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -35,9 +43,12 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          git pull origin main
           git add package.json package-lock.json
-          git commit -m "Bump version and update testdriverai@beta [skip ci]"
+          git commit -m "Bump version and update testdriverai@beta [skip ci]" || exit 0
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build .vsix package
         run: npm run build
