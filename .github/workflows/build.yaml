@@ -24,12 +24,6 @@ jobs:
       - name: Install project dependencies
         run: npm install
 
-      - name: Publish to vsce
-        run: npm run publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VSCE_PAT: ${{ secrets.VSCODE_PUBLISH_PAT }}
-
       - name: Build .vsix package
         run: npm run build
 
@@ -43,6 +37,12 @@ jobs:
             exit 1
           fi
           echo "vsix_path=$VSIX_PATH" >> $GITHUB_OUTPUT
+
+      - name: Publish to vsce
+        run: npm run publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VSCE_PAT: ${{ secrets.VSCODE_PUBLISH_PAT }}
 
       - name: Extract version from package.json
         id: get_version
