@@ -23,6 +23,12 @@ jobs:
       - name: Install project dependencies
         run: npm install
 
+      - name: Bump package version
+        run: npm version patch --no-git-tag-version
+
+      - name: Install latest testdriverai@beta
+        run: npm install testdriverai@beta --save
+
       - name: Build .vsix package
         run: npm run build
 
