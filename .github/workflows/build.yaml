@@ -15,7 +15,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '22'
 
       - name: Install global dependencies
         run: |
@@ -39,10 +39,7 @@ jobs:
           echo "vsix_path=$VSIX_PATH" >> $GITHUB_OUTPUT
 
       - name: Publish to vsce
-        run: npm run publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VSCE_PAT: ${{ secrets.VSCODE_PUBLISH_PAT }}
+        run: npx vsce publish --pat ${{ secrets.VSCODE_PUBLISH_PAT }}
 
       - name: Extract version from package.json
         id: get_version
