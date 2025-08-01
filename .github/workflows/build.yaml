@@ -51,7 +51,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build .vsix package
-        run: npm run package
+        run: npx vsce package
 
       - name: Set .vsix file path
         id: get_vsix
