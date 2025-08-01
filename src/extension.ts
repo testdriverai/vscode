@@ -2,6 +2,8 @@ import { track, logger, init as loggerInit } from './utils/logger';
 import { getEnv } from './utils/env';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 
 import { init } from './utils/init';
 import { setupTests } from './tests';
@@ -10,10 +12,6 @@ import { registerCommands, registerTestdriverRunTest } from './commands';
 
 // Import testdriverai package.json to get version
 import testdriverPackageJson from 'testdriverai/package.json';
-const os = require('os');
-const fs = require('fs');
-const path = require('path');
-
 
 export function deactivate() {}
 
