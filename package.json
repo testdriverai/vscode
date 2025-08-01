@@ -74,7 +74,7 @@
           },
           {
             "id": "runTest",
-            "title": "Run an example!t",
+            "title": "Run an example!",
             "description": "Open the VS Code Test Explorer to see and run a test by clicking the play button.\n[Open Test Panel](command:testdriver.runTest)",
             "media": {
               "image": "media/run.png",
