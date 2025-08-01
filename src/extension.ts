@@ -8,6 +8,9 @@ import { setupTests } from './tests';
 
 import { registerCommands, registerTestdriverRunTest } from './commands';
 
+// Import testdriverai package.json to get version
+import testdriverPackageJson from 'testdriverai/package.json';
+
 
 export function deactivate() {}
 
@@ -28,6 +31,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   logger.info('TestDriverAI extension activated', {
     isFirstInstall,
+    testdriverVersion: testdriverPackageJson.version,
   });
 
   if (isFirstInstall) {

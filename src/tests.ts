@@ -109,7 +109,7 @@ const refreshTests = async (
         .split('/'),
     }))
     .filter(({ parts }) => {
-      return !['', 'lifecycle', 'screenshots'].includes(parts[0]);
+      return !['', 'screenshots'].includes(parts[0]);
     });
 
   controller.items.forEach((item) => {
@@ -361,9 +361,64 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               agentCliArgs: agent.cliArgs
             });
 
+            // Create output channel for TestDriver debugging
+            const outputChannel = vscode.window.createOutputChannel('TestDriver Debug');
+
+            // General event logging for debugging
+            agent.emitter.on('**', (data: unknown) => {
+                let message: string;
+                if (typeof data === 'string' && typeof data.replace === 'function') {
+                  message = data.replace(/\n/g, '\r\n');
+                } else if (typeof data === 'object') {
+                  message = JSON.stringify(data, null, 2).replace(/\n/g, '\r\n');
+                } else {
+                  message = String(data);
+                }
+
+                outputChannel.appendLine(`[${agent.emitter.event}] ${message}`);
+              });
+
             // Listen to events from the agent's emitter
             agent.emitter.on('log:*', (data: string) => {
-              run.appendOutput(data.replace(/\n/g, '\r\n') + '\r\n', undefined, test);
+
+                let message: string;
+                if (typeof data === 'string' && typeof data.replace === 'function') {
+                  message = data.replace(/\n/g, '\r\n');
+                } else if (typeof data === 'object') {
+                  message = JSON.stringify(data, null, 2).replace(/\n/g, '\r\n');
+                } else {
+                  message = String(data);
+                }
+
+                // Try to get the location from the current command if available
+                let location: vscode.Location | undefined = undefined;
+                if (
+                agent.sourceMapper &&
+                typeof agent.sourceMapper.getCurrentSourcePosition === 'function'
+                ) {
+                const pos = agent.sourceMapper.getCurrentSourcePosition();
+                if (pos && pos.command) {
+                  const diagFile = (pos.filePath)
+                  ? vscode.Uri.file(pos.filePath)
+                  : test.uri;
+                  if (diagFile) {
+                  location = new vscode.Location(
+                    diagFile,
+                    new vscode.Range(
+                    pos.command.startLine,
+                    pos.command.startColumn,
+                    pos.command.endLine,
+                    pos.command.endColumn
+                    )
+                  );
+                  }
+                }
+                }
+                run.appendOutput(
+                `${message}\r\n`,
+                location,
+                test
+                );
             });
 
             // Listen for command status events to update gutter decorations
@@ -451,8 +506,7 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
               if (event && (event.includes('api') || event.includes('key') || event.includes('auth'))) {
                 console.log('API-related event:', event, data);
               }
-              logger.info(agent.emitter.event, { data: JSON.stringify(data, null, 2)});
-
+              logger.info(agent.emitter.event, data);
             });
 
             // Listen for show-window event to open TestDriver webview
@@ -527,12 +581,6 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                   }
                 });
               }
-
-              run.failed(test, new vscode.TestMessage(`Test failed with error: ${errorMessage}`));
-              track({
-                event: 'test.item.failed',
-                properties: { id: test.id, path: test.uri?.fsPath },
-              });
 
               // Restore original working directory
               process.chdir(originalCwd);

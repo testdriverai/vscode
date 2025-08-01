@@ -28,7 +28,7 @@
   "contributes": {
     "yamlValidation": [
       {
-        "fileMatch": "**/testdriver/*.{yml,yaml}",
+        "fileMatch": "**/testdriver/**/*.{yml,yaml}",
         "url": "https://raw.githubusercontent.com/testdriverai/testdriverai/main/schema.json"
       }
     ],
@@ -89,7 +89,6 @@
     "analytics-node": "^6.2.0",
     "dotenv": "^16.4.5",
     "strip-ansi": "^7.1.0",
-    "testdriverai": "^6.0.11-canary.b5886d1.0",
     "vscode-languageclient": "^9.0.0",
     "winston": "^3.17.0"
   },
