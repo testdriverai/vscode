@@ -10,8 +10,7 @@ import { setupTests } from './tests';
 
 import { registerCommands, registerTestdriverRunTest } from './commands';
 
-// Import testdriverai package.json to get version
-import testdriverPackageJson from 'testdriverai/package.json';
+// We'll get the testdriverai version at runtime to avoid bundling issues
 
 export function deactivate() {}
 
@@ -30,9 +29,18 @@ export async function activate(context: vscode.ExtensionContext) {
     true,
   );
 
+  // Get testdriverai version at runtime to avoid bundling issues
+  let testdriverVersion = 'unknown';
+  try {
+    const testdriverPackageJson = require('testdriverai/package.json');
+    testdriverVersion = testdriverPackageJson.version;
+  } catch (e) {
+    console.warn('Could not get testdriverai version:', e);
+  }
+
   logger.info('TestDriverAI extension activated', {
     isFirstInstall,
-    testdriverVersion: testdriverPackageJson.version,
+    testdriverVersion,
   });
 
   if (isFirstInstall) {

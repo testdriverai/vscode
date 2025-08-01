@@ -13,7 +13,7 @@ async function main() {
     sourcesContent: false,
     platform: 'node',
     outfile: 'dist/extension.js',
-    external: ['vscode', 'testdriverai'],
+    external: ['vscode', 'testdriverai', 'testdriverai/*'],
     logLevel: 'warning',
     plugins: [
       /* add to the end of plugins array */
