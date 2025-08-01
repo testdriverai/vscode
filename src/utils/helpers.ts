@@ -46,7 +46,7 @@ export function beautifyFilename(name: string) {
   return name
     .split('/')
     .pop()!
-    .replace(/\.[a-zA-Z0-9]$/, '')
+    .replace(/\.[a-zA-Z0-9]$/, '');
     // .replace(/[_-]/g, ' ');
 }
 
