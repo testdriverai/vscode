@@ -23,7 +23,8 @@
     "selenium"
   ],
   "activationEvents": [
-    "workspaceContains:testdriver/**"
+    "workspaceContains:testdriver/**",
+    "onStartupFinished"
   ],
   "contributes": {
     "yamlValidation": [
@@ -39,14 +40,60 @@
         "description": "Test your app with a computer-use agent in just a few minutes.",
         "steps": [
           {
-            "id": "explore",
-            "title": "Create your first test",
-            "description": "Tell TestDriver what you want to accomplish with the **/explore** command. TestDriver will generate and run commands.\n[Send a /explore](command:testdriver.explore)",
+            "id": "signup",
+            "title": "Get a TestDriver API Key",
+            "description": "Because TestDriver is powered by agentic users, a free account is required to access:\n\n - Dedicated Virtual Machines (VMs) for running agents\n- TestDriver AI + Vision models\n- Community support\n[Get API Key](https://app.testdriver.ai/)",
             "media": {
-              "markdown": "tutorial/explore.md"
+              "image": "media/main.png"
             },
             "completionEvents": [
-              "onCommand:testdriver.explore"
+              "openLink:https://app.testdriver.ai"
+            ]
+          },
+          {
+            "id": "api",
+            "title": "Set your API Key",
+            "description": "Configure TestDriver with your API Key.\n[Set Your API Key](command:testdriver.setApiKey)",
+            "media": {
+              "image": "media/main.png"
+            },
+            "completionEvents": [
+                "command:testdriver.setApiKey"
+            ]
+          },
+          {
+            "id": "clone",
+            "title": "Try an example",
+            "description": "Get set up quickly by cloning ready made examples.\n[Add Examples to this Workspace](command:testdriver.cloneExample)",
+            "media": {
+              "image": "media/main.png"
+            },
+            "completionEvents": [
+                "command:testdriver.cloneExample"
+            ]
+          },
+          {
+            "id": "runTest",
+            "title": "Run an example!t",
+            "description": "Open the VS Code Test Explorer to see and run a test by clicking the play button.\n[Open Test Panel](command:testdriver.runTest)",
+            "media": {
+              "image": "media/run.png",
+              "altText": "TestDriver run test interface"
+            },
+            "completionEvents": [
+                "command:testdriver.runTest"
+            ]
+          },
+          {
+            "id": "readDocs",
+            "title": "Read the docs",
+            "description": "There's so much more you can do to harness the power of TestDriver! \n[RTFM](https://docs.testdriver.ai)",
+            "media": {
+              "image": "media/run.png",
+              "altText": "TestDriver run test interface"
+            },
+            "completionEvents": [
+              "openLink:https://docs.testdriver.ai"
             ]
           }
         ]
@@ -72,18 +119,22 @@
       {
         "command": "testdriver.runTest",
         "title": "TestDriver: Run Test"
+      },
+      {
+        "command": "testdriver.cloneExample",
+        "title": "TestDriver: Clone Example"
       }
     ]
   },
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc",
-    "format": "prettier --write .",
-    "lint": "eslint",
-    "watch": "tsc -watch",
-    "build": "tsc && vsce package",
-    "publish": "vsce publish"
+    "compile": "npm run check-types && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "vscode:prepublish": "npm run package",
+    "package": "npm run check-types && node esbuild.js --production"
   },
   "dependencies": {
     "analytics-node": "^6.2.0",
@@ -102,6 +153,7 @@
     "@vscode/chat-extension-utils": "^0.0.0-alpha.1",
     "@vscode/prompt-tsx": "^0.3.0-alpha.12",
     "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.8",
     "eslint": "^9.13.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2",

@@ -7,15 +7,9 @@ export function registerRunTestCommand(context: vscode.ExtensionContext) {
   if (!controller) {
     controller = setupTests(context);
   }
-  const disposable = vscode.commands.registerCommand('testdriver.runTest', async (uri: vscode.Uri) => {
-    // Find the test item for this file
-    const testItem = controller?.items.get(uri.toString());
-    if (testItem) {
-      // Use the VS Code Testing API to run the test item for maximum compatibility
-      await vscode.commands.executeCommand('testing.runTests', [testItem]);
-    } else {
-      vscode.window.showWarningMessage('Test not found in Test Explorer. Try reloading the window.');
-    }
+  const disposable = vscode.commands.registerCommand('testdriver.runTest', async (_uri?: vscode.Uri) => {
+    // Open the VS Code Test Explorer panel
+    await vscode.commands.executeCommand('workbench.view.testing.focus');
   });
   context.subscriptions.push(disposable);
 }

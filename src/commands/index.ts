@@ -8,7 +8,7 @@ export const registerCommands = () => {
     track({ event: 'walkthrough.started' });
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
-      'testdriverai.testdriver#gettingStarted',
+      'testdriver.testdriver#gettingStarted',
       false,
     );
   });

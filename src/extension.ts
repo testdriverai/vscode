@@ -10,6 +10,9 @@ import { registerCommands, registerTestdriverRunTest } from './commands';
 
 // Import testdriverai package.json to get version
 import testdriverPackageJson from 'testdriverai/package.json';
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
 
 
 export function deactivate() {}
@@ -38,7 +41,7 @@ export async function activate(context: vscode.ExtensionContext) {
     track({ event: 'extension.installed' });
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
-      'testdriverai.testdriver#gettingStarted',
+      'testdriver.testdriver#gettingStarted',
       false,
     );
     // Prompt user to install MCP server for 'testdriver' key
@@ -136,4 +139,26 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage('Installing MCP server for: testdriver');
   });
   context.subscriptions.push(addMcpServerDisposable);
+
+  const cloneExampleDisposable = vscode.commands.registerCommand('testdriver.cloneExample', async () => {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      vscode.window.showWarningMessage('Please open a workspace folder first to clone the example.');
+      return;
+    }
+
+    // Create a truly temp dir
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'testdriverai-'));
+    const workspacePath = workspaceFolders[0].uri.fsPath;
+    const terminal = vscode.window.createTerminal({
+      name: 'TestDriver Example',
+      cwd: workspacePath
+    });
+    terminal.show();
+    terminal.sendText(`git clone https://github.com/testdriverai/cli "${tmpDir}"`, true);
+    terminal.sendText(`mv "${tmpDir}/testdriver" ./`, true);
+    terminal.sendText(`rm -rf "${tmpDir}"`, true);
+    vscode.window.showInformationMessage('Cloned TestDriver example project to workspace/testdriver');
+  });
+  context.subscriptions.push(cloneExampleDisposable);
 }
