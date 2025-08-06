@@ -51,7 +51,7 @@ steps:
                   "Accept" = "application/vnd.github.v3+json"
               }
 
-              $artifactsUrl = "https://api.github.com/repos/$env:TD_GITHUB_REPO/actions/runs/$env:TD_GITHUB_RUN_ID/artifacts"
+              $artifactsUrl = "${TD_ARTIFACT_URL}"
               Write-Host "Fetching artifacts from: $artifactsUrl"
 
               try {

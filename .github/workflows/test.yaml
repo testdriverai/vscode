@@ -65,6 +65,18 @@ jobs:
           echo "run_id=${{ github.run_id }}" >> $GITHUB_OUTPUT
           echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
 
+      - name: Download .vsix artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.set_artifact_info.outputs.artifact_name }}
+          path: ./downloaded-artifact
+
+      - name: Set artifact URL
+        id: set_artifact_url
+        run: |
+          ARTIFACT_URL="https://github.com/${{ steps.set_artifact_info.outputs.repo }}/actions/runs/${{ steps.set_artifact_info.outputs.run_id }}/artifacts"
+          echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+
       - name: Install TestDriver CLI
         run: npm install -g testdriverai@latest
 
@@ -73,6 +85,7 @@ jobs:
           TD_GITHUB_REPO: ${{ steps.set_artifact_info.outputs.repo }}
           TD_GITHUB_RUN_ID: ${{ steps.set_artifact_info.outputs.run_id }}
           TD_ARTIFACT_NAME: ${{ steps.set_artifact_info.outputs.artifact_name }}
+          TD_ARTIFACT_URL: ${{ steps.set_artifact_url.outputs.artifact_url }}
           TD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TD_API_KEY: ${{ secrets.TESTDRIVER_API_KEY }}
         run: |
@@ -80,4 +93,7 @@ jobs:
           echo "  Repository: $TD_GITHUB_REPO"
           echo "  Run ID: $TD_GITHUB_RUN_ID"
           echo "  Artifact Name: $TD_ARTIFACT_NAME"
+          echo "  Artifact URL: $TD_ARTIFACT_URL"
+          echo "Downloaded artifact contents:"
+          ls -la ./downloaded-artifact/
           npx testdriverai@latest run testdriver/onboarding.yaml
