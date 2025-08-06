@@ -1,4 +1,4 @@
-name: PR Test with TestDriver
+name: Test PR
 
 on:
   pull_request:
@@ -74,42 +74,10 @@ jobs:
           TD_GITHUB_RUN_ID: ${{ steps.set_artifact_info.outputs.run_id }}
           TD_ARTIFACT_NAME: ${{ steps.set_artifact_info.outputs.artifact_name }}
           TD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TESTDRIVER_API_KEY: ${{ secrets.TESTDRIVER_API_KEY }}
+          TD_API_KEY: ${{ secrets.TESTDRIVER_API_KEY }}
         run: |
           echo "Running TestDriver with GitHub artifact info:"
           echo "  Repository: $TD_GITHUB_REPO"
           echo "  Run ID: $TD_GITHUB_RUN_ID"
           echo "  Artifact Name: $TD_ARTIFACT_NAME"
           npx testdriverai@latest run testdriver/onboarding.yaml
-
-      - name: Comment on PR with results
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const success = '${{ job.status }}' === 'success';
-            const runUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            const artifactName = '${{ steps.set_artifact_info.outputs.artifact_name }}';
-
-            const body = success
-              ? `✅ **TestDriver tests passed!**
-
-                 The VS Code extension was successfully built and tested.
-
-                 📦 **Artifact:** ${artifactName}
-                 🔗 **Test Run:** [View full results](${runUrl})`
-              : `❌ **TestDriver tests failed**
-
-                 The VS Code extension build or tests encountered an error.
-
-                 📦 **Artifact:** ${artifactName}
-                 🔗 **Test Run:** [View full results](${runUrl})
-
-                 Please check the logs for more details.`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            });
