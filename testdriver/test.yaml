@@ -1,4 +1,0 @@
-steps:
-  - commands:
-      - command: assert
-        expect: windows is launched

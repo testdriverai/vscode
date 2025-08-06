@@ -1,8 +1,10 @@
-name: Build VSIX and Upload Artifact
+name: Build & Publish
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
   repository_dispatch:
     types: [cli-publish]
 

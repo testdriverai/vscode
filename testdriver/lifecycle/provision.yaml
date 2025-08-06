@@ -1,0 +1,142 @@
+version: 6.0.0
+steps:
+  - prompt: download and install vscode
+    commands:
+      - command: exec
+        lang: pwsh
+        timeout: 240000
+        code: |
+          # Set download URL and destination
+          $installerUrl = "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user"
+
+          Write-Host "Downloading VS Code installer..."
+          Invoke-WebRequest -Uri $installerUrl -OutFile C:\Users\testdriver\Desktop\VSCodeSetup.exe
+
+          if (Test-Path C:\Users\testdriver\Desktop\VSCodeSetup.exe) {
+              Write-Host "Download complete. Starting installation..."
+
+              # Silent install VS Code (per user)
+              Start-Process "cmd.exe" -ArgumentList "/c", "C:\Users\testdriver\Desktop\VSCodeSetup.exe /verysilent /norestart /nolaunch" -WindowStyle Hidden
+
+              Write-Host "Installation complete."
+
+              Write-Host "VS Code installation completed successfully."
+          } else {
+              Write-Host "Failed to download the installer."
+              exit 1
+          }
+
+          Write-Host "Script completed successfully."
+          exit 0
+
+  - prompt: download testdriver vsix
+    commands:
+      - command: exec
+        lang: pwsh
+        timeout: 120000
+        code: |
+          # Set download URL and destination for VSIX
+          $vsixPath = "$env:USERPROFILE\Desktop\testdriver.vsix"
+
+          # Check if we should download from GitHub artifacts
+          if ($env:TD_GITHUB_REPO -and $env:TD_GITHUB_RUN_ID -and $env:TD_ARTIFACT_NAME -and $env:TD_GITHUB_TOKEN) {
+              Write-Host "Downloading VSIX from GitHub artifact..."
+              Write-Host "Repository: $env:TD_GITHUB_REPO"
+              Write-Host "Run ID: $env:TD_GITHUB_RUN_ID"
+              Write-Host "Artifact Name: $env:TD_ARTIFACT_NAME"
+
+              # Get artifact download URL using GitHub API
+              $headers = @{
+                  "Authorization" = "token $env:TD_GITHUB_TOKEN"
+                  "Accept" = "application/vnd.github.v3+json"
+              }
+
+              $artifactsUrl = "${TD_ARTIFACT_URL}"
+              Write-Host "Fetching artifacts from: $artifactsUrl"
+
+              try {
+                  $artifactsResponse = Invoke-RestMethod -Uri $artifactsUrl -Headers $headers
+                  $artifact = $artifactsResponse.artifacts | Where-Object { $_.name -eq $env:TD_ARTIFACT_NAME }
+
+                  if (-not $artifact) {
+                      Write-Host "Artifact '$env:TD_ARTIFACT_NAME' not found"
+                      exit 1
+                  }
+
+                  $downloadUrl = $artifact.archive_download_url
+                  Write-Host "Downloading artifact from: $downloadUrl"
+
+                  # Download the artifact (it will be a zip file)
+                  $zipPath = "$env:USERPROFILE\Desktop\artifact.zip"
+                  Invoke-RestMethod -Uri $downloadUrl -Headers $headers -OutFile $zipPath
+
+                  # Extract the VSIX from the zip
+                  Expand-Archive -Path $zipPath -DestinationPath "$env:USERPROFILE\Desktop\artifact_extract" -Force
+
+                  # Find the VSIX file in the extracted content
+                  $vsixFile = Get-ChildItem -Path "$env:USERPROFILE\Desktop\artifact_extract" -Filter "*.vsix" -Recurse | Select-Object -First 1
+
+                  if (-not $vsixFile) {
+                      Write-Host "No VSIX file found in artifact"
+                      exit 1
+                  }
+
+                  # Copy the VSIX to the expected location
+                  Copy-Item -Path $vsixFile.FullName -Destination $vsixPath
+
+                  # Clean up
+                  Remove-Item -Path $zipPath -Force
+                  Remove-Item -Path "$env:USERPROFILE\Desktop\artifact_extract" -Recurse -Force
+
+                  Write-Host "VSIX downloaded from GitHub artifact successfully."
+              }
+              catch {
+                  Write-Host "Error downloading from GitHub artifact: $_"
+                  exit 1
+              }
+          }
+          # Check if TD_VSIX environment variable is set for direct URL download
+          elseif ($env:TD_VSIX) {
+              $vsixUrl = $env:TD_VSIX
+              Write-Host "Using TD_VSIX environment variable: $vsixUrl"
+              Write-Host "Downloading TestDriver VSIX..."
+              Invoke-WebRequest -Uri $vsixUrl -OutFile $vsixPath
+          }
+          # Use default URL
+          else {
+              $vsixUrl = "https://github.com/testdriverai/vscode/releases/download/v0.6.28/testdriver.vsix"
+              Write-Host "Using default VSIX URL: $vsixUrl"
+              Write-Host "Downloading TestDriver VSIX..."
+              Invoke-WebRequest -Uri $vsixUrl -OutFile $vsixPath
+          }
+
+          if (Test-Path $vsixPath) {
+              Write-Host "VSIX download complete."
+          } else {
+              Write-Host "Failed to download the VSIX file."
+              exit 1
+          }
+
+          Write-Host "VSIX download completed successfully."
+          exit 0
+  - prompt: install testdriver extension and launch vscode
+    commands:
+      - command: wait
+        timeout: 3000
+      - command: exec
+        lang: pwsh
+        timeout: 120000
+        code: |
+          # First, install the extension
+          Write-Host "Installing TestDriver extension..."
+          $installResult = Start-Process "C:\Users\testdriver\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd" -ArgumentList "--install-extension", "C:\Users\testdriver\Desktop\testdriver.vsix" -Wait -PassThru
+
+          if ($installResult.ExitCode -eq 0) {
+              Write-Host "Extension installed successfully."
+          } else {
+              Write-Host "Failed to install extension. Exit code: $($installResult.ExitCode)"
+              exit 1
+          }
+
+          Write-Host "Script completed successfully."
+          exit 0

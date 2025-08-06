@@ -1,0 +1,99 @@
+name: Test PR
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+jobs:
+  test-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install global dependencies
+        run: |
+          npm install -g typescript prettier eslint vsce
+
+      - name: Install project dependencies
+        run: npm install
+
+      - name: Build .vsix package
+        run: |
+          npm run package
+          npx vsce package
+
+      - name: Set .vsix file path
+        id: get_vsix
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          VSIX_PATH="./testdriver-${VERSION}.vsix"
+          if [ ! -f "$VSIX_PATH" ]; then
+            echo "VSIX file not found at $VSIX_PATH"
+            exit 1
+          fi
+          echo "vsix_path=$VSIX_PATH" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload .vsix as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: testdriver-extension-pr-${{ github.event.number || 'manual' }}
+          path: ${{ steps.get_vsix.outputs.vsix_path }}
+          retention-days: 30
+
+      - name: Set artifact info for TestDriver
+        id: set_artifact_info
+        run: |
+          ARTIFACT_NAME="testdriver-extension-pr-${{ github.event.number || 'manual' }}"
+          echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          echo "run_id=${{ github.run_id }}" >> $GITHUB_OUTPUT
+          echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+
+      - name: Download .vsix artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.set_artifact_info.outputs.artifact_name }}
+          path: ./downloaded-artifact
+
+      - name: Set artifact URL
+        id: set_artifact_url
+        run: |
+          ARTIFACT_URL="https://github.com/${{ steps.set_artifact_info.outputs.repo }}/actions/runs/${{ steps.set_artifact_info.outputs.run_id }}/artifacts"
+          echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+
+      - name: Install TestDriver CLI
+        run: npm install -g testdriverai@latest
+
+      - name: Run TestDriver tests
+        env:
+          TD_GITHUB_REPO: ${{ steps.set_artifact_info.outputs.repo }}
+          TD_GITHUB_RUN_ID: ${{ steps.set_artifact_info.outputs.run_id }}
+          TD_ARTIFACT_NAME: ${{ steps.set_artifact_info.outputs.artifact_name }}
+          TD_ARTIFACT_URL: ${{ steps.set_artifact_url.outputs.artifact_url }}
+          TD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TD_API_KEY: ${{ secrets.TESTDRIVER_API_KEY }}
+        run: |
+          echo "Running TestDriver with GitHub artifact info:"
+          echo "  Repository: $TD_GITHUB_REPO"
+          echo "  Run ID: $TD_GITHUB_RUN_ID"
+          echo "  Artifact Name: $TD_ARTIFACT_NAME"
+          echo "  Artifact URL: $TD_ARTIFACT_URL"
+          echo "Downloaded artifact contents:"
+          ls -la ./downloaded-artifact/
+          npx testdriverai@latest run testdriver/onboarding.yaml

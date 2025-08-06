@@ -1,0 +1,61 @@
+version: 6.0.11-canary.19d3fc5.0
+session: 68926072667c50ddbc078b0e
+steps:
+  - prompt: assert that the testdriver getting starting guide shows
+    commands:
+      - command: focus-application
+        name: Visual Studio Code
+      - command: assert
+        expect: >-
+          the "Get Started with TestDriver" guide is visible in Visual Studio
+          Code
+  - prompt: assert the first step is get api key
+    commands:
+      - command: focus-application
+        name: Visual Studio Code
+      - command: assert
+        expect: >-
+          the first step in the getting started guide is "Get a TestDriver API
+          Key"
+  - prompt: click on get api key blue button
+    commands:
+      - command: focus-application
+        name: Visual Studio Code
+      - command: hover-text
+        text: Get API Key
+        description: blue button labeled Get API Key inside the first step box on the left
+        action: click
+  - prompt: 'click on open '
+    commands:
+      - command: focus-application
+        name: Visual Studio Code
+      - command: hover-text
+        text: Open
+        description: >-
+          blue button labeled Open in the Visual Studio Code external website
+          dialog
+        action: click
+  - prompt: complete the edge onboarding and skip everything
+    commands:
+      - command: focus-application
+        name: Microsoft Edge
+      - command: hover-text
+        text: Start without your data
+        description: >-
+          gray button labeled Start without your data under the blue sign in
+          button on the Edge onboarding screen
+        action: click
+      - command: hover-text
+        text: "Confirm and continue"
+        description: blue button labeled Confirm and continue on the Edge onboarding screen
+        action: click
+      - command: hover-text
+        text: "Continue without Google data"
+        description: gray button labeled Continue without Google data under the blue Sign in for Google data button on the Edge onboarding screen
+        action: click
+      - command: hover-text
+        text: "Confirm and start browsing"
+        description: blue button labeled Confirm and start browsing on the Edge onboarding screen
+        action: click
+      - command: assert
+        expect: The testdriver login page is visible in Microsoft Edge
