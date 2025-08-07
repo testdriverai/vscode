@@ -38,8 +38,8 @@ jobs:
       - name: Bump package version
         run: npm version patch --no-git-tag-version
 
-      - name: Install latest testdriverai@beta
-        run: npm install testdriverai@beta --save
+      - name: Install latest testdriverai@latest
+        run: npm install testdriverai@latest --save
 
       - name: Commit package updates
         run: |
@@ -47,7 +47,7 @@ jobs:
           git config --local user.name "GitHub Action"
           git pull origin main
           git add package.json package-lock.json
-          git commit -m "Bump version and update testdriverai@beta [skip ci]" || exit 0
+          git commit -m "Bump version and update testdriverai@latest [skip ci]" || exit 0
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
