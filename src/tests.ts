@@ -378,6 +378,35 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                 outputChannel.appendLine(`[${agent.emitter.event}] ${message}`);
               });
 
+
+
+            // Allow any type for message
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const sendToSandbox = (message: any) => {
+              // ensure message is a string
+              if (typeof message !== "string") {
+              message = JSON.stringify(message);
+              }
+              agent.sandbox.send({
+              type: "output",
+              output: Buffer.from(message).toString("base64"),
+              });
+            };
+
+            // Handle sandbox connection with pattern matching for subsequent events
+            agent.emitter.on("sandbox:connected", () => {
+              // Once sandbox is connected, send all log and error events to sandbox
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              agent.emitter.on("log:*", (message: any) => {
+              sendToSandbox(message);
+              });
+
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              agent.emitter.on("error:*", (message: any) => {
+              sendToSandbox(message);
+              });
+            });
+
             // Listen to events from the agent's emitter
             agent.emitter.on('log:*', (data: string) => {
 
