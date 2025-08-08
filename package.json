@@ -26,6 +26,10 @@
     "workspaceContains:testdriver/**",
     "onStartupFinished"
   ],
+  "extensionDependencies": [
+    "kisstkondoros.vscode-gutter-preview",
+    "redhat.vscode-yaml"
+  ],
   "contributes": {
     "yamlValidation": [
       {

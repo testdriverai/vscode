@@ -69,29 +69,6 @@ export async function activate(context: vscode.ExtensionContext) {
   const controller = setupTests(context);
   context.subscriptions.push(controller);
 
-  vscode.workspace.onDidOpenTextDocument((doc) => {
-    const isYaml = doc.languageId === 'yaml' || doc.fileName.endsWith('.yaml');
-    const isTestDriverYaml = doc.uri.fsPath.includes(path.join('testdriver', ''));
-
-    if (isYaml && isTestDriverYaml) {
-      const yamlExt = vscode.extensions.getExtension('redhat.vscode-yaml');
-
-      if (!yamlExt) {
-        vscode.window.showInformationMessage(
-          'TestDriver: Install "YAML by Red Hat" for schema validation and better editing in TestDriver YAML files.',
-          'Install'
-        ).then(selection => {
-          if (selection === 'Install') {
-            vscode.commands.executeCommand(
-              'workbench.extensions.installExtension',
-              'redhat.vscode-yaml'
-            );
-          }
-        });
-      }
-    }
-  });
-
   const consent = context.globalState.get<string>('testdriver.analyticsConsent');
 
   if (consent === undefined) {
