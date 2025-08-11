@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/testdriverai/testdriverai"
   },
-  "version": "0.6.38",
+  "version": "0.6.39",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -140,7 +140,7 @@
     "analytics-node": "^6.2.0",
     "dotenv": "^16.4.5",
     "strip-ansi": "^7.1.0",
-    "testdriverai": "^6.0.14",
+    "testdriverai": "^6.0.15",
     "vscode-languageclient": "^9.0.0",
     "winston": "^3.17.0"
   },
