@@ -16,6 +16,33 @@ const TestDriverAgent = require('testdriverai');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const AnsiToHtml = require('ansi-to-html');
 
+// Import Node.js fs module for reading directories
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const fs = require('fs');
+
+// Get examples from testdriverai package using fs
+let testdriverExamples: string[] = [];
+try {
+  const testdriveraiPath = require.resolve('testdriverai');
+  const packageRoot = path.dirname(testdriveraiPath);
+  const examplesPath = path.join(packageRoot, 'testdriver', 'examples');
+
+  console.log('Startup: testdriveraiPath:', testdriveraiPath);
+  console.log('Startup: packageRoot:', packageRoot);
+  console.log('Startup: examplesPath:', examplesPath);
+
+  if (fs.existsSync(examplesPath)) {
+    testdriverExamples = fs.readdirSync(examplesPath).filter((file: string) => {
+      return fs.statSync(path.join(examplesPath, file)).isDirectory();
+    });
+    console.log('Startup: Found testdriverai examples:', testdriverExamples);
+  } else {
+    console.log('Startup: Examples path does not exist:', examplesPath);
+  }
+} catch (error) {
+  console.log('Startup: Could not load testdriverai examples:', error);
+}
+
 /**
  * Load environment variables from the workspace .env file
  * This ensures testdriverai gets the correct environment variables from the user's workspace
@@ -79,7 +106,7 @@ function processAnsiToHtml(text: string, converter: typeof AnsiToHtml): string {
   if (!text || typeof text !== 'string') {
     return text;
   }
-  
+
   try {
     return converter.toHtml(text);
   } catch (error) {
@@ -113,6 +140,97 @@ function processEventData(args: unknown[], converter: typeof AnsiToHtml): unknow
   });
 }
 
+/**
+ * Open a file and highlight a specific line/column
+ */
+async function openAndHighlightFile(filePath: string, lineNumber?: number, columnNumber?: number): Promise<void> {
+  try {
+    console.log(`Attempting to open file: ${filePath}, line: ${lineNumber}, column: ${columnNumber}`);
+
+    const fileUri = vscode.Uri.file(filePath);
+
+    // Check if file exists
+    try {
+      await vscode.workspace.fs.stat(fileUri);
+    } catch {
+      console.error(`File does not exist: ${filePath}`);
+      return;
+    }
+
+    // Open the file in the bottom panel (below VM window)
+    const document = await vscode.window.showTextDocument(fileUri, {
+      viewColumn: vscode.ViewColumn.Two, // Bottom panel
+      preview: false,
+      preserveFocus: false
+    });
+
+    console.log(`Successfully opened file: ${filePath}`);
+
+    // Highlight the specific line if provided
+    if (lineNumber !== undefined && lineNumber > 0) {
+      const line = Math.max(0, lineNumber - 1); // Convert to 0-based indexing
+      const column = Math.max(0, (columnNumber || 1) - 1); // Convert to 0-based indexing
+
+      console.log(`Highlighting line ${line + 1}, column ${column + 1} (0-based: ${line}, ${column})`);
+
+      // Create a range that spans the entire line for better visibility
+      const lineText = document.document.lineAt(line);
+      const range = new vscode.Range(
+        new vscode.Position(line, 0),
+        new vscode.Position(line, lineText.text.length)
+      );
+
+      // Set selection and reveal the range
+      document.selection = new vscode.Selection(range.start, range.end);
+      document.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+
+      console.log(`Highlighted range: line ${range.start.line + 1} to ${range.end.line + 1}`);
+    } else {
+      console.log('No line number provided for highlighting');
+    }
+  } catch (error) {
+    console.error('Failed to open and highlight file:', error);
+  }
+}
+
+interface StepInfo {
+  stepIndex: number;
+  startLine: number;
+  startColumn: number;
+  endLine: number;
+  endColumn: number;
+  prompt?: {
+    startLine: number;
+    startColumn: number;
+    endLine: number;
+    endColumn: number;
+  };
+}
+
+interface CommandInfo {
+  commandIndex: number;
+  startLine: number;
+  startColumn: number;
+  endLine: number;
+  endColumn: number;
+  command: string;
+}
+
+interface SourcePosition {
+  filePath: string;
+  step?: StepInfo;
+  command?: CommandInfo;
+  lineNumber?: number;
+  columnNumber?: number;
+}
+
+interface EventData {
+  sourcePosition?: SourcePosition;
+  source?: SourcePosition;
+  position?: SourcePosition;
+  [key: string]: unknown;
+}
+
 export function registerChatCommand(context: vscode.ExtensionContext) {
   const disposable = vscode.commands.registerCommand('testdriver.openChat', async () => {
     track({ event: 'chat.opened' });
@@ -136,7 +254,268 @@ export function registerChatCommand(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable);
 }
 
-export { handleChatMessage };
+/**
+ * List available TestDriver examples from testdriverai package
+ */
+async function showTestDriverExamples(workspaceFolder: vscode.WorkspaceFolder, webview: vscode.Webview | vscode.WebviewView['webview']): Promise<void> {
+  try {
+    let examples: string[] = [];
+
+    console.log('=== DEBUG showTestDriverExamples ===');
+    console.log('showTestDriverExamples - global testdriverExamples:', testdriverExamples);
+    console.log('showTestDriverExamples - global testdriverExamples.length:', testdriverExamples.length);
+    console.log('=== END DEBUG ===');
+
+    // First try to use the global variable
+    if (testdriverExamples && testdriverExamples.length > 0) {
+      examples = testdriverExamples;
+      console.log('Found examples from global testdriverExamples:', examples);
+    } else {
+      console.log('Global testdriverExamples not available, trying fresh load...');
+
+      // Try to load examples fresh using the same logic as startup
+      try {
+        const testdriveraiPath = require.resolve('testdriverai');
+        const packageRoot = path.dirname(testdriveraiPath);
+        const examplesPath = path.join(packageRoot, 'testdriver', 'examples');
+
+        console.log('Fresh load - testdriveraiPath:', testdriveraiPath);
+        console.log('Fresh load - packageRoot:', packageRoot);
+        console.log('Fresh load - examplesPath:', examplesPath);
+
+        if (fs.existsSync(examplesPath)) {
+          examples = fs.readdirSync(examplesPath).filter((file: string) => {
+            return fs.statSync(path.join(examplesPath, file)).isDirectory();
+          });
+          console.log('Fresh load - Found examples:', examples);
+        } else {
+          console.log('Fresh load - Examples path does not exist:', examplesPath);
+        }
+      } catch (freshLoadError) {
+        console.log('Fresh load failed:', freshLoadError);
+      }
+
+      // If fresh load didn't work, try VS Code workspace fallback
+      if (examples.length === 0) {
+        try {
+          const nodeModulesPath = path.join(workspaceFolder.uri.fsPath, 'node_modules', 'testdriverai', 'testdriver', 'examples');
+          console.log('Checking workspace node_modules path:', nodeModulesPath);
+          const examplesUri = vscode.Uri.file(nodeModulesPath);
+          const files = await vscode.workspace.fs.readDirectory(examplesUri);
+          examples = files
+            .filter(([name, type]) => type === vscode.FileType.Directory && !name.startsWith('.'))
+            .map(([name]) => name);
+          console.log('Found examples from workspace node_modules:', examples);
+        } catch (dirError) {
+          console.log('Could not read examples from workspace node_modules:', dirError);
+          // Final fallback to actual available examples
+          examples = ['arc-browser', 'chrome-extension', 'doom', 'mobile', 'npm', 'performance', 'playwright-test-recording', 'vscode-extension', 'web'];
+          console.log('Using hardcoded fallback examples:', examples);
+        }
+      }
+    }
+
+    // Send examples list to webview
+    webview.postMessage({
+      command: 'showExamples',
+      examples: examples.map(example => ({
+        name: example,
+        displayName: example.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error showing examples:', error);
+    webview.postMessage({
+      command: 'error',
+      data: 'Failed to load TestDriver examples'
+    });
+  }
+}
+
+/**
+ * Recursively copy a directory using Node.js fs module
+ */
+async function copyDirectoryRecursively(sourceDir: string, destDir: string): Promise<void> {
+  const items = fs.readdirSync(sourceDir);
+
+  for (const item of items) {
+    const sourcePath = path.join(sourceDir, item);
+    const destPath = path.join(destDir, item);
+    const stat = fs.statSync(sourcePath);
+
+    if (stat.isDirectory()) {
+      // Create directory and recursively copy contents
+      try {
+        await vscode.workspace.fs.createDirectory(vscode.Uri.file(destPath));
+      } catch {
+        // Directory might already exist
+      }
+      await copyDirectoryRecursively(sourcePath, destPath);
+    } else if (stat.isFile()) {
+      // Copy file
+      const content = fs.readFileSync(sourcePath, 'utf8');
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(destPath), new TextEncoder().encode(content));
+    }
+  }
+}
+
+/**
+ * Recursively copy a directory using VS Code workspace API
+ */
+async function copyDirectoryRecursivelyVscode(sourceDir: string, destDir: string): Promise<void> {
+  const sourceUri = vscode.Uri.file(sourceDir);
+  const files = await vscode.workspace.fs.readDirectory(sourceUri);
+
+  for (const [fileName, fileType] of files) {
+    const sourcePath = path.join(sourceDir, fileName);
+    const destPath = path.join(destDir, fileName);
+
+    if (fileType === vscode.FileType.Directory) {
+      // Create directory and recursively copy contents
+      try {
+        await vscode.workspace.fs.createDirectory(vscode.Uri.file(destPath));
+      } catch {
+        // Directory might already exist
+      }
+      await copyDirectoryRecursivelyVscode(sourcePath, destPath);
+    } else if (fileType === vscode.FileType.File) {
+      // Copy file
+      const sourceFileUri = vscode.Uri.file(sourcePath);
+      const destFileUri = vscode.Uri.file(destPath);
+      await vscode.workspace.fs.copy(sourceFileUri, destFileUri, { overwrite: true });
+    }
+  }
+}
+
+/**
+ * Find the main test file in a directory (looks for testdriver.yaml or similar)
+ */
+function findMainTestFile(directory: string): string {
+  const items = fs.readdirSync(directory, { withFileTypes: true });
+
+  // Look for common main test file patterns
+  const commonNames = ['testdriver.yaml', 'testdriver.yml', 'test.yaml', 'test.yml'];
+
+  for (const name of commonNames) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (items.some((item: any) => item.isFile() && item.name === name)) {
+      return name;
+    }
+  }
+
+  // Fallback: find any YAML file that contains 'testdriver' in the name
+  for (const item of items) {
+    if (item.isFile() && item.name.includes('testdriver') && (item.name.endsWith('.yaml') || item.name.endsWith('.yml'))) {
+      return item.name;
+    }
+  }
+
+  // Final fallback: find any YAML file
+  for (const item of items) {
+    if (item.isFile() && (item.name.endsWith('.yaml') || item.name.endsWith('.yml'))) {
+      return item.name;
+    }
+  }
+
+  return 'testdriver.yaml'; // default fallback
+}
+
+/**
+ * Copy an example to the workspace testdriver folder
+ */
+async function copyExampleToWorkspace(exampleName: string, workspaceFolder: vscode.WorkspaceFolder, webview: vscode.Webview | vscode.WebviewView['webview']): Promise<void> {
+  try {
+    const workspaceTestdriverPath = path.join(workspaceFolder.uri.fsPath, 'testdriver');
+
+    // Create testdriver directory if it doesn't exist
+    const testdriverUri = vscode.Uri.file(workspaceTestdriverPath);
+    try {
+      await vscode.workspace.fs.createDirectory(testdriverUri);
+    } catch {
+      // Directory might already exist, which is fine
+    }
+
+    let mainFileName = 'testdriver.yaml';
+    let copySuccess = false;
+
+    // Try to copy from the testdriverai package using fs
+    try {
+      const testdriveraiPath = require.resolve('testdriverai');
+      const packageRoot = path.dirname(testdriveraiPath);
+      const sourceExamplePath = path.join(packageRoot, 'testdriver', 'examples', exampleName);
+
+      if (fs.existsSync(sourceExamplePath) && fs.statSync(sourceExamplePath).isDirectory()) {
+        // Recursively copy the entire directory structure
+        await copyDirectoryRecursively(sourceExamplePath, workspaceTestdriverPath);
+
+        // Find the main test file after copying
+        mainFileName = findMainTestFile(workspaceTestdriverPath);
+
+        copySuccess = true;
+        console.log('Copied example from testdriverai package using fs:', exampleName);
+      }
+    } catch (fsError) {
+      console.log('Could not copy from testdriverai package using fs:', fsError);
+    }
+
+    // Fallback: try to read from node_modules directory structure using VS Code API
+    if (!copySuccess) {
+      try {
+        const nodeModulesExamplePath = path.join(workspaceFolder.uri.fsPath, 'node_modules', 'testdriverai', 'testdriver', 'examples', exampleName);
+
+        // Check if source directory exists
+        const stat = await vscode.workspace.fs.stat(vscode.Uri.file(nodeModulesExamplePath));
+        if (stat.type === vscode.FileType.Directory) {
+          // Copy the entire example directory contents recursively
+          await copyDirectoryRecursivelyVscode(nodeModulesExamplePath, workspaceTestdriverPath);
+
+          // Find the main test file after copying
+          mainFileName = findMainTestFile(workspaceTestdriverPath);
+
+          copySuccess = true;
+          console.log('Copied example from node_modules directory:', exampleName);
+        }
+      } catch (dirError) {
+        console.log('Could not copy from node_modules directory:', dirError);
+      }
+    }
+
+    if (!copySuccess) {
+      throw new Error(`Example not found: ${exampleName}`);
+    }
+
+    // Open the main test file
+    const mainTestFile = path.join(workspaceTestdriverPath, mainFileName);
+    await vscode.window.showTextDocument(vscode.Uri.file(mainTestFile), {
+      viewColumn: vscode.ViewColumn.One,
+      preview: false
+    });
+
+    webview.postMessage({
+      command: 'agentEvent',
+      eventName: 'log:info',
+      data: [`✅ Copied ${exampleName} example to testdriver/ folder and opened it for editing.`]
+    });
+
+    webview.postMessage({
+      command: 'chatResponse'
+    });
+
+  } catch (error) {
+    console.error('Error copying example:', error);
+    webview.postMessage({
+      command: 'error',
+      data: `Failed to copy example: ${error instanceof Error ? error.message : 'Unknown error'}`
+    });
+
+    webview.postMessage({
+      command: 'chatResponse'
+    });
+  }
+}
+
+export { handleChatMessage, showTestDriverExamples };
 
 async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel | vscode.WebviewView, context: vscode.ExtensionContext) {
   try {
@@ -154,6 +533,32 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
     }
 
     const workspaceFolder = workspaceFolders[0];
+
+    // Check if testdriver folder exists in workspace
+    const testdriverFolderPath = path.join(workspaceFolder.uri.fsPath, 'testdriver');
+    let testdriverFolderExists = false;
+    try {
+      const stat = await vscode.workspace.fs.stat(vscode.Uri.file(testdriverFolderPath));
+      testdriverFolderExists = stat.type === vscode.FileType.Directory;
+    } catch {
+      testdriverFolderExists = false;
+    }
+
+    // If no testdriver folder, show examples selection
+    if (!testdriverFolderExists) {
+      const webview = 'webview' in panel ? panel.webview : panel;
+
+      // Check if this is a request to copy an example
+      if (userMessage.startsWith('/copy-example ')) {
+        const exampleName = userMessage.replace('/copy-example ', '').trim();
+        await copyExampleToWorkspace(exampleName, workspaceFolder, webview);
+        return;
+      }
+
+      // Show available examples
+      await showTestDriverExamples(workspaceFolder, webview);
+      return;
+    }
 
     // Load .env file from workspace folder to ensure testdriverai gets the right environment variables
     loadWorkspaceEnv(workspaceFolder);
@@ -251,6 +656,46 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
         });
       });
 
+            // Handle step:start events to open and highlight files
+      agent.emitter.on('step:start', async (data: EventData) => {
+        console.log('Step started - full data:', JSON.stringify(data, null, 2));
+
+        if (data.sourcePosition && data.sourcePosition.filePath) {
+          const sourcePos = data.sourcePosition;
+          const step = sourcePos.step;
+
+          if (step) {
+            console.log('Opening file for step:', sourcePos.filePath, 'line:', step.startLine);
+            await openAndHighlightFile(sourcePos.filePath, step.startLine, step.startColumn);
+          } else {
+            console.log('Opening file for step (fallback):', sourcePos.filePath);
+            await openAndHighlightFile(sourcePos.filePath);
+          }
+        } else {
+          console.log('No source position found in step data');
+        }
+      });
+
+      // Handle command:start events to open and highlight files
+      agent.emitter.on('command:start', async (data: EventData) => {
+        console.log('Command started - full data:', JSON.stringify(data, null, 2));
+
+        if (data.sourcePosition && data.sourcePosition.filePath) {
+          const sourcePos = data.sourcePosition;
+          const command = sourcePos.command;
+
+          if (command) {
+            console.log('Opening file for command:', sourcePos.filePath, 'line:', command.startLine);
+            await openAndHighlightFile(sourcePos.filePath, command.startLine, command.startColumn);
+          } else {
+            console.log('Opening file for command (fallback):', sourcePos.filePath);
+            await openAndHighlightFile(sourcePos.filePath);
+          }
+        } else {
+          console.log('No source position found in command data');
+        }
+      });
+
       // Handle exit event separately for special processing
       agent.emitter.on('exit', (code: number | null) => {
         console.log('TestDriver agent exited with code:', code);
@@ -330,13 +775,84 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
         }
       }
 
-      // Now send the user message as an exploratory prompt
-      // This is like what the readline interface does for non-command input
-      console.log('Sending user message to exploratory loop:', userMessage);
-      await agent.exploratoryLoop(userMessage, false, true, true);
+      // Now handle the user message like readline does
+      console.log('Processing user message:', userMessage);
 
-      // The agent will continue running and emitting events
-      // The conversation is complete when the agent finishes processing
+      // Clear any previous error counts for new input
+      agent.errorCounts = {};
+
+      // Inject environment variables into any ${VAR} strings
+      const processedMessage = agent.parser.interpolate(userMessage, agent.config._environment);
+
+      try {
+        // Parse interactive commands (starting with /)
+        if (processedMessage.startsWith("/")) {
+          const parts = processedMessage.slice(1).split(" ");
+          const commandName = parts[0];
+          const args = parts.slice(1);
+
+          // Parse options (flags starting with --)
+          const options: Record<string, string | boolean> = {};
+          const cleanArgs: string[] = [];
+
+          for (let i = 0; i < args.length; i++) {
+            const arg = args[i];
+            if (arg.startsWith("--")) {
+              // Handle both --flag=value and --flag value formats
+              if (arg.includes("=")) {
+                // --flag=value format
+                const [fullFlag, ...valueParts] = arg.split("=");
+                const optName = fullFlag.slice(2);
+                const value = valueParts.join("="); // rejoin in case value contains =
+                options[optName] = value;
+              } else {
+                // --flag value format
+                const optName = arg.slice(2);
+                if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
+                  options[optName] = args[i + 1];
+                  i++; // skip the next argument as it's the value
+                } else {
+                  options[optName] = true;
+                }
+              }
+            } else {
+              cleanArgs.push(arg);
+            }
+          }
+
+          // Use unified command system like readline does
+          await agent.executeUnifiedCommand(commandName, cleanArgs, options);
+        } else {
+          // Handle regular exploratory input like readline does
+          await agent.exploratoryLoop(
+            processedMessage.replace(/^\/explore\s+/, ""),
+            false,
+            true,
+            true,
+          );
+        }
+
+        // Send completion signal to webview (like readline returning to prompt)
+        const webview = 'webview' in panel ? panel.webview : panel;
+        webview.postMessage({
+          command: 'chatResponse'
+        });
+
+      } catch (error) {
+        console.error('Command error:', error);
+
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        const webview = 'webview' in panel ? panel.webview : panel;
+        webview.postMessage({
+          command: 'error',
+          data: `Command error: ${errorMessage}`
+        });
+
+        webview.postMessage({
+          command: 'chatResponse'
+        });
+      }
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);

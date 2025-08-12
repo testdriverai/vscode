@@ -15,6 +15,9 @@ class TestDriverWebview {
   init() {
     this.setupEventListeners();
     this.focusInput();
+
+    // Signal that the webview is ready to receive messages
+    this.vscode.postMessage({ command: 'webviewReady' });
   }
 
   setupEventListeners() {
@@ -42,15 +45,22 @@ class TestDriverWebview {
           this.handleAgentEvent(message.eventName, message.data);
           break;
         case 'chatResponse':
+          // Command completed, ready for next input (like readline promptUser)
           this.isRunning = false;
           this.sendButton.disabled = false;
           this.sendButton.textContent = 'Send';
+          this.focusInput(); // Auto-focus for continuous interaction
+          break;
+        case 'showExamples':
+          console.log('Webview received showExamples:', message.examples);
+          this.showExamplesSelection(message.examples);
           break;
         case 'error':
           this.addMessage(message.data, 'error', '❌');
           this.isRunning = false;
           this.sendButton.disabled = false;
           this.sendButton.textContent = 'Send';
+          this.focusInput(); // Auto-focus even after error
           break;
       }
     });
@@ -274,6 +284,58 @@ class TestDriverWebview {
     }
   }
 
+  showExamplesSelection(examples) {
+    // Instead of hiding empty state and creating a message,
+    // update the empty state to show examples
+    const emptyState = document.getElementById('emptyState');
+    if (emptyState) {
+      emptyState.innerHTML = `
+        <img src="${window.mediaSrc}/icon.png" alt="TestDriver" class="helmet-large" />
+        <h3>No testdriver files found</h3>
+        <p>Select an example to get started:</p>
+        <div class="examples-grid">
+          ${examples.map(example => `
+            <button class="example-button" onclick="selectExample('${example.name}')">
+              <div class="example-name">${example.displayName}</div>
+            </button>
+          `).join('')}
+        </div>
+        <p class="examples-note">This will create a testdriver folder and copy the selected example files to it.</p>
+      `;
+    }
+
+    // Keep input enabled for selecting examples
+    this.isRunning = false;
+    this.sendButton.disabled = false;
+    this.sendButton.textContent = 'Send';
+  }
+
+  updateEmptyStateExamples(examples) {
+    console.log('updateEmptyStateExamples called with:', examples);
+    const examplePrompts = document.getElementById('examplePrompts');
+    const loadingExamples = document.getElementById('loadingExamples');
+
+    if (loadingExamples) {
+      loadingExamples.remove();
+    }
+
+    if (examplePrompts) {
+      console.log('Updating empty state with', examples.length, 'examples');
+      examplePrompts.innerHTML = `
+        ${examples.map(example => `
+          <button class="example-prompt" onclick="useExample('/copy-example ${example.name}')">
+            /copy-example ${example.name}
+          </button>
+        `).join('')}
+        <button class="example-prompt" onclick="useExample('/help')">
+          /help
+        </button>
+      `;
+    } else {
+      console.log('Could not find examplePrompts element');
+    }
+  }
+
   focusInput() {
     this.chatInput.focus();
   }
@@ -283,6 +345,17 @@ class TestDriverWebview {
 function useExample(prompt) {
   if (window.testDriverWebview) {
     window.testDriverWebview.useExample(prompt);
+  }
+}
+
+// Global function for selecting examples
+function selectExample(exampleName) {
+  if (window.testDriverWebview) {
+    // Send copy example command
+    window.testDriverWebview.vscode.postMessage({
+      command: 'sendMessage',
+      message: `/copy-example ${exampleName}`
+    });
   }
 }
 

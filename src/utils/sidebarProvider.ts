@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { showTestDriverExamples, handleChatMessage } from '../commands/chat';
 
 export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'testdriver-sidebar';
@@ -28,10 +29,16 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
+      console.log('Sidebar received message:', message);
       switch (message.command) {
+        case 'webviewReady': {
+          console.log('Webview is ready, checking for examples...');
+          // Webview is now ready to receive messages
+          await this._checkAndShowExamples(webviewView);
+          break;
+        }
         case 'sendMessage': {
-          const chatModule = await import('../commands/chat.js');
-          await chatModule.handleChatMessage(message.message, webviewView, this._context);
+          await handleChatMessage(message.message, webviewView, this._context);
           break;
         }
       }
@@ -41,6 +48,71 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
   public postMessage(message: { command: string; data: string }) {
     if (this._view) {
       this._view.webview.postMessage(message);
+    }
+  }
+
+  private async _checkAndShowExamples(webviewView: vscode.WebviewView) {
+    console.log('_checkAndShowExamples called');
+    // Get the current workspace folders
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      console.log('No workspace folders found');
+      return;
+    }
+
+    console.log('Available workspace folders:', workspaceFolders.map(f => f.uri.fsPath));
+
+    // Check if we're in development mode (extension development workspace)
+    const isExtensionDev = workspaceFolders.some(folder =>
+      folder.uri.fsPath.includes('testdriver-vscode-extension')
+    );
+
+    // Find a workspace folder that doesn't have a testdriver folder
+    // This prioritizes user project folders over the extension development folder
+    let targetWorkspaceFolder = workspaceFolders[0]; // fallback to first
+    let showExamples = false;
+
+    for (const folder of workspaceFolders) {
+      const testdriverFolderPath = vscode.Uri.file(folder.uri.fsPath + '/testdriver');
+      try {
+        const stat = await vscode.workspace.fs.stat(testdriverFolderPath);
+        const hasTestdriverFolder = stat.type === vscode.FileType.Directory;
+        console.log(`Folder ${folder.uri.fsPath} has testdriver folder:`, hasTestdriverFolder);
+
+        if (!hasTestdriverFolder) {
+          targetWorkspaceFolder = folder;
+          showExamples = true;
+          break;
+        }
+      } catch {
+        // Folder doesn't have testdriver directory
+        console.log(`Folder ${folder.uri.fsPath} does not have testdriver folder`);
+        targetWorkspaceFolder = folder;
+        showExamples = true;
+        break;
+      }
+    }
+
+    // In development mode, always show examples for testing purposes
+    if (isExtensionDev && !showExamples) {
+      console.log('Extension development mode detected, showing examples for testing');
+      showExamples = true;
+      // Use the second workspace folder if available (likely the user's project)
+      if (workspaceFolders.length > 1) {
+        targetWorkspaceFolder = workspaceFolders[1];
+      }
+    }
+
+    console.log('Target workspace folder:', targetWorkspaceFolder.uri.fsPath);
+    console.log('Show examples:', showExamples);
+
+    // If we found a folder without testdriver, show examples
+    if (showExamples) {
+      console.log('Loading examples for workspace folder:', targetWorkspaceFolder.uri.fsPath);
+      await showTestDriverExamples(targetWorkspaceFolder, webviewView.webview);
+      console.log('showTestDriverExamples completed');
+    } else {
+      console.log('All workspace folders have testdriver folders, not showing examples');
     }
   }
 
@@ -138,8 +210,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .message-avatar {
             width: 16px;
             height: 16px;
-            border-radius: 8px;
-            background-color: var(--vscode-badge-background);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -156,7 +226,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .message.user .message-avatar {
-            background-color: var(--vscode-button-background);
+            /* Remove background for cleaner look */
           }
 
           .message-content {
@@ -334,6 +404,54 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-button-secondaryHoverBackground);
           }
 
+          /* Examples selection styles */
+          .examples-selection h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: var(--vscode-foreground);
+          }
+
+          .examples-selection p {
+            margin: 0 0 12px 0;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+          }
+
+          .examples-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+          }
+
+          .example-button {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: 1px solid var(--vscode-button-border, transparent);
+            border-radius: 4px;
+            padding: 12px 8px;
+            cursor: pointer;
+            font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
+            text-align: center;
+            transition: background-color 0.1s ease;
+          }
+
+          .example-button:hover {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+          }
+
+          .example-name {
+            font-size: 11px;
+            font-weight: 600;
+          }
+
+          .examples-note {
+            font-size: 10px;
+            font-style: italic;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 8px !important;
+          }
+
           /* ANSI color support - VS Code theme compatible */
           .ansi-bright-black { color: var(--vscode-terminal-ansiBlack, #666666); }
           .ansi-bright-red { color: var(--vscode-terminal-ansiRed, #f14c4c); }
@@ -404,28 +522,20 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             <div class="empty-state" id="emptyState">
               <img src="${mediaSrc}/icon.png" alt="TestDriver" class="helmet-large" />
               <h3>TestDriver Chat</h3>
-              <p>Ask TestDriver to help with testing and automation tasks.</p>
-              <div class="example-prompts">
-                <button class="example-prompt" onclick="useExample('Test the login flow')">
-                  Test the login flow
-                </button>
-                <button class="example-prompt" onclick="useExample('Create a test for the shopping cart')">
-                  Create a test for the shopping cart
-                </button>
-                <button class="example-prompt" onclick="useExample('Help me debug this test')">
-                  Help me debug this test
-                </button>
+              <p>Interactive TestDriver commands and exploration.</p>
+              <div class="example-prompts" id="examplePrompts">
+                <!-- Examples will be dynamically loaded here -->
+                <div id="loadingExamples">Loading examples...</div>
               </div>
             </div>
           </div>
 
           <div class="input-container">
-            <textarea
-              id="chatInput"
-              class="chat-input"
-              placeholder="Ask TestDriver..."
-              rows="1"
-            ></textarea>
+                          <textarea
+                id="chatInput"
+                placeholder="What would you like to test?"
+                style="flex: 1; padding: 12px; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--vscode-input-foreground); resize: none; border-radius: 4px; font-family: var(--vscode-font-family); line-height: 1.3; min-height: 20px; max-height: 80px; overflow-y: auto;"
+              ></textarea>
             <button id="sendButton" class="send-button">Send</button>
           </div>
         </div>
