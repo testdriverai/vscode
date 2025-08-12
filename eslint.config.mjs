@@ -10,7 +10,7 @@ import stylistic from '@stylistic/eslint-plugin';
 
 export default tseslint.config(
   {
-    ignores: ['.vscode-test', 'out'],
+    ignores: ['.vscode-test', 'out', 'media/**/*.js'],
   },
   {
     files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'],

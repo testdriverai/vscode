@@ -12,6 +12,10 @@ const dotenv = require('dotenv');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const TestDriverAgent = require('testdriverai');
 
+// Import ansi-to-html for processing ANSI codes
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const AnsiToHtml = require('ansi-to-html');
+
 /**
  * Load environment variables from the workspace .env file
  * This ensures testdriverai gets the correct environment variables from the user's workspace
@@ -35,6 +39,78 @@ function loadWorkspaceEnv(workspaceFolder: vscode.WorkspaceFolder): void {
   } catch (e) {
     console.log('Error loading .env file from workspace folder:', e);
   }
+}
+
+/**
+ * Create an ANSI to HTML converter configured for VS Code theme colors
+ */
+function createAnsiConverter(): typeof AnsiToHtml {
+  return new AnsiToHtml({
+    fg: '#cccccc',
+    bg: 'transparent',
+    newline: false,
+    escapeXML: false,
+    stream: false,
+    colors: {
+      0: '#000000',   // black
+      1: '#cd3131',   // red
+      2: '#0dbc79',   // green
+      3: '#e5e510',   // yellow
+      4: '#2472c8',   // blue
+      5: '#bc3fbc',   // magenta
+      6: '#11a8cd',   // cyan
+      7: '#e5e5e5',   // white
+      8: '#666666',   // bright black (gray)
+      9: '#f14c4c',   // bright red
+      10: '#23d18b',  // bright green
+      11: '#f5f543',  // bright yellow
+      12: '#3b8eea',  // bright blue
+      13: '#d670d6',  // bright magenta
+      14: '#29b8db',  // bright cyan
+      15: '#ffffff'   // bright white
+    }
+  });
+}
+
+/**
+ * Process a string that may contain ANSI codes and convert them to HTML
+ */
+function processAnsiToHtml(text: string, converter: typeof AnsiToHtml): string {
+  if (!text || typeof text !== 'string') {
+    return text;
+  }
+  
+  try {
+    return converter.toHtml(text);
+  } catch (error) {
+    console.warn('Failed to convert ANSI to HTML:', error);
+    // Fallback: remove ANSI codes using proper escape sequence
+    // eslint-disable-next-line no-control-regex
+    return text.replace(/\x1b\[[0-9;]*m/g, '');
+  }
+}
+
+/**
+ * Process agent event data to convert any ANSI codes to HTML
+ */
+function processEventData(args: unknown[], converter: typeof AnsiToHtml): unknown[] {
+  return args.map(arg => {
+    if (typeof arg === 'string') {
+      return processAnsiToHtml(arg, converter);
+    } else if (typeof arg === 'object' && arg !== null) {
+      // Recursively process object properties
+      const processed: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(arg)) {
+        if (typeof value === 'string') {
+          processed[key] = processAnsiToHtml(value, converter);
+        } else {
+          processed[key] = value;
+        }
+      }
+      return processed;
+    }
+    return arg;
+  });
 }
 
 export function registerChatCommand(context: vscode.ExtensionContext) {
@@ -155,16 +231,22 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
       // Track that we're running a chat session
       let chatEnded = false;
 
+      // Create ANSI to HTML converter
+      const ansiConverter = createAnsiConverter();
+
       // Unified event forwarding - listen to all events and forward them to webview
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       agent.emitter.onAny((eventName: string, ...args: any[]) => {
         console.log('Received agent event:', eventName, args);
 
+        // Process ANSI codes in the event data
+        const processedArgs = processEventData(args, ansiConverter);
+
         const webview = 'webview' in panel ? panel.webview : panel;
         webview.postMessage({
           command: 'agentEvent',
           eventName: eventName,
-          data: args,
+          data: processedArgs,
           timestamp: Date.now()
         });
       });
