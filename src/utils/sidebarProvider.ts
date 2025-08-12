@@ -451,7 +451,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
             const avatarDiv = document.createElement('div');
             avatarDiv.className = 'message-avatar';
-            
+
             if (type === 'user') {
               avatarDiv.textContent = '👤';
             } else {

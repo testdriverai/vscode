@@ -219,14 +219,14 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
       // Open the test file being edited (relative to workspace)
       const testFilePath = path.join(workingDir, 'testdriver', 'testdriver.yaml');
       const testFileUri = vscode.Uri.file(testFilePath);
-      
+
       // Hide terminal when opening test files
       try {
         await vscode.commands.executeCommand('workbench.action.closePanel');
       } catch {
         // Ignore if panel is already closed
       }
-      
+
       try {
         await vscode.window.showTextDocument(testFileUri, {
           viewColumn: vscode.ViewColumn.Two, // Open below the VM window
