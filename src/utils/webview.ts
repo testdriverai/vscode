@@ -2,10 +2,16 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 
 export function openTestDriverWebview(url: string, title = 'TestDriver') {
+  // Hide terminal if it's open
+  vscode.commands.executeCommand('workbench.action.terminal.toggleTerminal').then(() => {
+    // Check if terminal is visible and hide it
+    vscode.commands.executeCommand('workbench.action.closePanel');
+  });
+
   const panel = vscode.window.createWebviewPanel(
     'testdriverWebview',
     title,
-    vscode.ViewColumn.Active,
+    vscode.ViewColumn.One, // Open in first column (top)
     {
       enableScripts: true,
       retainContextWhenHidden: true,

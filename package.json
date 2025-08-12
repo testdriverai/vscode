@@ -103,6 +103,38 @@
         ]
       }
     ],
+    "views": {
+      "testdriver-activity": [
+        {
+          "id": "testdriver-sidebar",
+          "name": "Chat",
+          "type": "webview"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "testdriver-activity",
+          "title": "TestDriver",
+          "icon": "media/icon.png"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "testdriver.openChat",
+          "when": "view == testExplorer",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "testdriver.openChat"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "testdriver.toggleAnalytics",
@@ -127,6 +159,11 @@
       {
         "command": "testdriver.cloneExample",
         "title": "TestDriver: Clone Example"
+      },
+      {
+        "command": "testdriver.openChat",
+        "title": "TestDriver: Open Chat",
+        "icon": "$(comment-discussion)"
       }
     ]
   },
@@ -142,6 +179,7 @@
   },
   "dependencies": {
     "analytics-node": "^6.2.0",
+    "ansi-to-html": "^0.7.2",
     "dotenv": "^16.4.5",
     "strip-ansi": "^7.1.0",
     "testdriverai": "^6.0.15",
