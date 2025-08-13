@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { showTestDriverExamples, handleChatMessage } from '../commands/chat';
+import { showTestDriverExamples, handleChatMessage, stopTestExecution } from '../commands/chat';
 import { openInBottomGroup } from './layout';
 
 export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
@@ -46,6 +46,10 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           await this._handleRunTests();
           break;
         }
+        case 'stopTest': {
+          await this._handleStopTest(webviewView);
+          break;
+        }
       }
     });
 
@@ -82,6 +86,22 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
   private _isTestDriverFile(uri: vscode.Uri): boolean {
     return uri.fsPath.includes('/testdriver/') &&
            (uri.fsPath.endsWith('.yml') || uri.fsPath.endsWith('.yaml'));
+  }
+
+  private async _handleStopTest(webviewView: vscode.WebviewView) {
+    try {
+      console.log('Stopping TestDriver test execution...');
+      await stopTestExecution();
+
+      // Send message to webview to reset the UI state
+      webviewView.webview.postMessage({
+        command: 'testStopped'
+      });
+
+    } catch (error) {
+      console.error('Error stopping test:', error);
+      vscode.window.showErrorMessage('Failed to stop TestDriver test: ' + (error as Error).message);
+    }
   }
 
   private async _handleRunTests() {

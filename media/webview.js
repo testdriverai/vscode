@@ -23,14 +23,32 @@ class TestDriverWebview {
   }
 
   setupEventListeners() {
-    this.sendButton.addEventListener('click', () => this.sendMessage());
+    this.sendButton.addEventListener('click', () => {
+      if (this.isRunning) {
+        this.stopTest();
+      } else {
+        this.sendMessage();
+      }
+    });
 
     // Handle both old and new run buttons
     if (this.runButton) {
-      this.runButton.addEventListener('click', () => this.runTests());
+      this.runButton.addEventListener('click', () => {
+        if (this.isRunning) {
+          this.stopTest();
+        } else {
+          this.runTests();
+        }
+      });
     }
     if (this.runButtonTop) {
-      this.runButtonTop.addEventListener('click', () => this.runTests());
+      this.runButtonTop.addEventListener('click', () => {
+        if (this.isRunning) {
+          this.stopTest();
+        } else {
+          this.runTests();
+        }
+      });
     }
 
     this.chatInput.addEventListener('keydown', (e) => {
@@ -59,7 +77,37 @@ class TestDriverWebview {
           this.isRunning = false;
           this.sendButton.disabled = false;
           this.sendButton.textContent = 'Send';
+
+          // Reset run button states as well
+          if (this.runButton) {
+            this.runButton.disabled = false;
+            this.runButton.textContent = 'Run';
+          }
+          if (this.runButtonTop) {
+            this.runButtonTop.disabled = false;
+            this.runButtonTop.textContent = 'Run';
+          }
+
           this.focusInput(); // Auto-focus for continuous interaction
+          break;
+        case 'testStopped':
+          // Test was stopped by user
+          this.addMessage('🛑 Test execution stopped', 'status', '🛑');
+          this.isRunning = false;
+          this.sendButton.disabled = false;
+          this.sendButton.textContent = 'Send';
+
+          // Reset run button states as well
+          if (this.runButton) {
+            this.runButton.disabled = false;
+            this.runButton.textContent = 'Run';
+          }
+          if (this.runButtonTop) {
+            this.runButtonTop.disabled = false;
+            this.runButtonTop.textContent = 'Run';
+          }
+
+          this.focusInput();
           break;
         case 'showExamples':
           console.log('Webview received showExamples:', message.examples);
@@ -89,6 +137,17 @@ class TestDriverWebview {
           this.isRunning = false;
           this.sendButton.disabled = false;
           this.sendButton.textContent = 'Send';
+
+          // Reset run button states as well
+          if (this.runButton) {
+            this.runButton.disabled = false;
+            this.runButton.textContent = 'Run';
+          }
+          if (this.runButtonTop) {
+            this.runButtonTop.disabled = false;
+            this.runButtonTop.textContent = 'Run';
+          }
+
           this.focusInput(); // Auto-focus even after error
           break;
       }
@@ -146,19 +205,28 @@ class TestDriverWebview {
 
   sendMessage() {
     const message = this.chatInput.value.trim();
-    if (!message || this.isRunning) {
+    if (!message) {
       return;
     }
 
     this.addMessage(message, 'user');
     this.chatInput.value = '';
     this.isRunning = true;
-    this.sendButton.disabled = true;
-    this.sendButton.textContent = 'Running...';
+    this.sendButton.disabled = false; // Keep button enabled for stopping
+    this.sendButton.textContent = 'Stop';
 
     this.vscode.postMessage({
       command: 'sendMessage',
       message: message
+    });
+  }
+
+  stopTest() {
+    console.log('Stopping test execution...');
+    this.addMessage('🛑 Stopping test execution...', 'status', '🛑');
+
+    this.vscode.postMessage({
+      command: 'stopTest'
     });
   }
 
@@ -170,14 +238,14 @@ class TestDriverWebview {
     this.addMessage('🧪 Running TestDriver test for current file...', 'status', '🧪');
     this.isRunning = true;
 
-    // Disable both buttons
+    // Change button text to "Stop" but keep them enabled
     if (this.runButton) {
-      this.runButton.disabled = true;
-      this.runButton.textContent = 'Running...';
+      this.runButton.disabled = false;
+      this.runButton.textContent = 'Stop';
     }
     if (this.runButtonTop) {
-      this.runButtonTop.disabled = true;
-      this.runButtonTop.textContent = 'Running...';
+      this.runButtonTop.disabled = false;
+      this.runButtonTop.textContent = 'Stop';
     }
 
     this.vscode.postMessage({

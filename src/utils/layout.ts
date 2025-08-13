@@ -9,27 +9,20 @@ export async function ensureVerticalLayout(): Promise<void> {
     // Close any open panels first
     await vscode.commands.executeCommand('workbench.action.closePanel');
 
-    // Check if we already have multiple editor groups
-    // We can do this by trying to focus the second editor group
-    // If it fails, we don't have a second group yet
-    let hasSecondGroup = false;
-    try {
-      await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
-      hasSecondGroup = true;
-    } catch {
-      hasSecondGroup = false;
-    }
+    // First, ensure we're in a single editor group state
+    await vscode.commands.executeCommand('workbench.action.editorLayoutSingle');
+    
+    // Give a small delay for the layout reset to take effect
+    await new Promise(resolve => setTimeout(resolve, 50));
 
-    if (!hasSecondGroup) {
-      // First, focus on the first editor group
-      await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+    // Focus on the first editor group
+    await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
 
-      // Then create a new editor group below (this creates vertical split)
-      await vscode.commands.executeCommand('workbench.action.newGroupBelow');
+    // Explicitly set the editor layout to be vertically stacked (2 rows, 1 column)
+    await vscode.commands.executeCommand('workbench.action.editorLayoutTwoRows');
 
-      // Give a small delay for the layout change to take effect
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    // Give a small delay for the layout change to take effect
+    await new Promise(resolve => setTimeout(resolve, 100));
 
   } catch (error) {
     console.log('Could not ensure vertical layout:', error);
@@ -62,7 +55,7 @@ export async function openInBottomGroup(document: vscode.TextDocument | vscode.U
     // Ensure we have vertical layout first
     await ensureVerticalLayout();
 
-    // Focus on the second editor group (bottom)
+    // Focus on the second editor group (bottom in vertical layout)
     await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');
 
     const uri = document instanceof vscode.Uri ? document : document.uri;

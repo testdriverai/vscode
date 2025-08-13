@@ -518,9 +518,28 @@ async function copyExampleToWorkspace(exampleName: string, workspaceFolder: vsco
   }
 }
 
-export { handleChatMessage, showTestDriverExamples };
+// Function to stop the current test execution
+async function stopTestExecution(): Promise<void> {
+  if (globalAgent) {
+    try {
+      console.log('Stopping TestDriver agent...');
+      await globalAgent.exit();
+      globalAgent = null;
+      console.log('TestDriver agent stopped and removed from memory');
+    } catch (error) {
+      console.error('Error stopping TestDriver agent:', error);
+      // Force clear the global agent even if exit fails
+      globalAgent = null;
+    }
+  } else {
+    console.log('No active TestDriver agent to stop');
+  }
+}
 
-let globalAgent: TestDriverAgent | null = null;
+export { handleChatMessage, showTestDriverExamples, stopTestExecution };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let globalAgent: any = null;
 
 async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel | vscode.WebviewView, context: vscode.ExtensionContext) {
   try {
@@ -711,6 +730,9 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
       agent.emitter.on('exit', (code: number | null) => {
         console.log('TestDriver agent exited with code:', code);
 
+        // Clear the global agent since it has exited
+        globalAgent = null;
+
         // Restore original working directory
         process.chdir(originalCwd);
 
@@ -752,7 +774,7 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
 
       // Build the environment (sandbox) for interactive mode
       console.log('Building environment...');
-      await agent.buildEnv({ new: true });
+      await agent.buildEnv({ });
 
       // Open the test file being edited (relative to workspace)
       const testFilePath = path.join(workingDir, 'testdriver', 'testdriver.yaml');
