@@ -373,48 +373,17 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .file-indicator {
-            padding: 8px 12px;
-            background-color: var(--vscode-editor-background);
-            border-bottom: 1px solid var(--vscode-sideBar-border);
+            padding: 6px 8px;
+            background-color: var(--vscode-sideBar-background);
+            border-top: 1px solid var(--vscode-sideBar-border);
             flex-shrink: 0;
             display: none; /* Hidden by default */
             border-left: 3px solid var(--vscode-testing-runAction);
+            font-size: 11px;
           }
 
           .file-indicator.visible {
             display: block;
-          }
-
-          .run-button-container {
-            background-color: var(--vscode-editor-background);
-            border-top: 1px solid var(--vscode-sideBar-border);
-            flex-shrink: 0;
-            font-size: 11px;
-            display: none; /* Hidden by default */
-          }
-
-          .run-button-container.visible {
-            display: block;
-          }
-
-          .run-button-top {
-            background-color: var(--vscode-testing-runAction);
-            color: var(--vscode-button-foreground);
-            border: none;
-            border-radius: 3px;
-            padding: 8px 12px;
-            cursor: pointer;
-            width: 100%;
-          }
-
-          .run-button-top:hover:not(:disabled) {
-            background-color: var(--vscode-button-hoverBackground);
-          }
-
-          .run-button-top:disabled {
-            background-color: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
-            cursor: not-allowed;
           }
 
           .file-info {
@@ -473,9 +442,12 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .message.user .message-content {
-            background-color: transparent; /* Remove background */
-            border: none; /* Remove border */
+            background-color: var(--vscode-chat-requestBubbleBackground);
+            border-radius: 8px;
+            padding: 8px 12px;
+            max-width: 90%;
             margin-left: auto;
+            width: fit-content;
           }
 
           .message-avatar {
@@ -670,6 +642,12 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             flex-shrink: 0;
           }
 
+          .button-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+          }
+
           .chat-input {
             background-color: var(--vscode-input-background);
             color: var(--vscode-input-foreground);
@@ -696,7 +674,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             padding: 6px 12px;
             cursor: pointer;
             font-size: 12px;
-            width: 100%;
+            flex: 1;
             height: 28px;
           }
 
@@ -707,6 +685,28 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .send-button:disabled {
             background-color: var(--vscode-button-secondaryBackground);
             color: var(--vscode-button-secondaryForeground);
+            cursor: not-allowed;
+          }
+
+          .run-button-small {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: none;
+            border-radius: 3px;
+            padding: 6px 8px;
+            cursor: pointer;
+            font-size: 11px;
+            flex-shrink: 0;
+            height: 28px;
+            white-space: nowrap;
+          }
+
+          .run-button-small:hover:not(:disabled) {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+          }
+
+          .run-button-small:disabled {
+            opacity: 0.6;
             cursor: not-allowed;
           }
 
@@ -888,12 +888,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           <div class="title">TestDriver</div>
         </div>
 
-        <div class="file-indicator" id="fileIndicator">
-          <div class="file-info">
-            <span class="file-path" id="currentFile">No file selected</span>
-          </div>
-        </div>
-
         <div class="chat-container">
           <div class="messages" id="messages">
             <div class="empty-state" id="emptyState">
@@ -904,17 +898,22 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             </div>
           </div>
 
+          <div class="file-indicator" id="fileIndicator">
+            <div class="file-info">
+              <span class="file-path" id="currentFile">No file selected</span>
+            </div>
+          </div>
+
           <div class="input-container">
                           <textarea
                 id="chatInput"
                 placeholder="What would you like to test?"
                 style="flex: 1; padding: 12px; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--vscode-input-foreground); resize: none; border-radius: 4px; font-family: var(--vscode-font-family); line-height: 1.3; min-height: 20px; max-height: 80px; overflow-y: auto;"
               ></textarea>
-            <button id="sendButton" class="send-button">Add Test Step</button>
-          </div>
-
-          <div class="run-button-container" id="runButtonContainer">
-            <button id="runButtonTop" class="run-button-top">Run From Start</button>
+            <div class="button-row">
+              <button id="runButtonTop" class="run-button-small">Run</button>
+              <button id="sendButton" class="send-button">Generate Test Steps</button>
+            </div>
           </div>
         </div>
 

@@ -478,40 +478,30 @@ class TestDriverWebview {
   }
 
   showRunButton() {
-    const runButtonContainer = document.getElementById('runButtonContainer');
-    if (runButtonContainer) {
-      runButtonContainer.classList.add('visible');
+    const runButtonTop = document.getElementById('runButtonTop');
+    if (runButtonTop) {
+      runButtonTop.style.display = 'block';
     }
   }
 
   hideRunButton() {
-    const runButtonContainer = document.getElementById('runButtonContainer');
-    if (runButtonContainer) {
-      runButtonContainer.classList.remove('visible');
+    const runButtonTop = document.getElementById('runButtonTop');
+    if (runButtonTop) {
+      runButtonTop.style.display = 'none';
     }
   }
 
   hideInputAndRunButton() {
     const inputContainer = document.querySelector('.input-container');
-    const runButtonContainer = document.getElementById('runButtonContainer');
-
     if (inputContainer) {
       inputContainer.style.display = 'none';
-    }
-    if (runButtonContainer) {
-      runButtonContainer.classList.remove('visible');
     }
   }
 
   showInputAndRunButton() {
     const inputContainer = document.querySelector('.input-container');
-    const runButtonContainer = document.getElementById('runButtonContainer');
-
     if (inputContainer) {
       inputContainer.style.display = 'flex';
-    }
-    if (runButtonContainer) {
-      runButtonContainer.classList.add('visible');
     }
   }
 

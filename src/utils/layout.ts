@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 /**
  * Ensures VS Code is in vertical layout (horizontal editor group split)
- * where editor groups are stacked vertically
+ * where editor groups are arranged top and bottom
  */
 export async function ensureVerticalLayout(): Promise<void> {
   try {
