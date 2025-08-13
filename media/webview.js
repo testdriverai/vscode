@@ -5,6 +5,8 @@ class TestDriverWebview {
     this.messagesContainer = document.getElementById('messages');
     this.chatInput = document.getElementById('chatInput');
     this.sendButton = document.getElementById('sendButton');
+    this.runButton = document.getElementById('runButton'); // Keep for backward compatibility
+    this.runButtonTop = document.getElementById('runButtonTop');
     this.emptyState = document.getElementById('emptyState');
     this.isRunning = false;
     this.streamingMessages = new Map();
@@ -22,6 +24,14 @@ class TestDriverWebview {
 
   setupEventListeners() {
     this.sendButton.addEventListener('click', () => this.sendMessage());
+
+    // Handle both old and new run buttons
+    if (this.runButton) {
+      this.runButton.addEventListener('click', () => this.runTests());
+    }
+    if (this.runButtonTop) {
+      this.runButtonTop.addEventListener('click', () => this.runTests());
+    }
 
     this.chatInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -54,6 +64,16 @@ class TestDriverWebview {
         case 'showExamples':
           console.log('Webview received showExamples:', message.examples);
           this.showExamplesSelection(message.examples);
+          break;
+        case 'testFileInfo':
+          // Update the running message to show which file is being tested
+          this.addMessage(`🎯 Running test for: ${message.fileName}`, 'status', '🎯');
+          break;
+        case 'updateFileIndicator':
+          this.updateFileIndicator(message.workspaceName, message.fileName);
+          break;
+        case 'showRunButton':
+          this.showRunButton();
           break;
         case 'error':
           this.addMessage(message.data, 'error', '❌');
@@ -109,6 +129,9 @@ class TestDriverWebview {
     this.messagesContainer.appendChild(messageDiv);
     this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
 
+    // Trigger syntax highlighting for any new code blocks
+    this.highlightCodeBlocks();
+
     return messageDiv;
   }
 
@@ -130,6 +153,43 @@ class TestDriverWebview {
     });
   }
 
+  runTests() {
+    if (this.isRunning) {
+      return;
+    }
+
+    this.addMessage('🧪 Running TestDriver test for current file...', 'status', '🧪');
+    this.isRunning = true;
+
+    // Disable both buttons
+    if (this.runButton) {
+      this.runButton.disabled = true;
+      this.runButton.textContent = 'Running...';
+    }
+    if (this.runButtonTop) {
+      this.runButtonTop.disabled = true;
+      this.runButtonTop.textContent = 'Running...';
+    }
+
+    this.vscode.postMessage({
+      command: 'runTests'
+    });
+
+    // Reset button state after tests should have started
+    setTimeout(() => {
+      this.isRunning = false;
+      if (this.runButton) {
+        this.runButton.disabled = false;
+        this.runButton.textContent = 'Run From Start';
+      }
+      if (this.runButtonTop) {
+        this.runButtonTop.disabled = false;
+        this.runButtonTop.textContent = 'Run From Start';
+      }
+      this.addMessage('Test execution started for the specific file. Check the Test Explorer for results.', 'status', '<span class="codicon codicon-check"></span>');
+    }, 1500);
+  }
+
   useExample(prompt) {
     this.chatInput.value = prompt;
     this.sendMessage();
@@ -142,23 +202,48 @@ class TestDriverWebview {
   }
 
   processMarkdown(text) {
-    // Convert code blocks to syntax highlighted YAML blocks
+
+    console.log('Processing markdown:', text);
+
+    // Store code blocks temporarily to avoid processing them with line break conversion
+    const codeBlocks = [];
+    let codeBlockIndex = 0;
+
+    // Convert code blocks to syntax highlighted blocks using Prism.js
     text = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
       // Default to yaml if no language specified or if it's yaml/yml
       const lang = language && language.toLowerCase();
       const isYaml = !lang || lang === 'yaml' || lang === 'yml';
+      const finalLang = isYaml ? 'yaml' : lang;
 
+      // Preserve original whitespace and line breaks in code
+      const cleanCode = code.replace(/^\n/, '').replace(/\n$/, '');
+
+      let codeBlock;
       if (isYaml) {
-        return '<pre class="code-block yaml"><code class="language-yaml">' +
-               this.escapeHtml(code.trim()) + '</code></pre>';
+        codeBlock = '<pre class="code-block yaml"><code class="language-yaml">' +
+          cleanCode + '</code></pre>';
       } else {
-        return '<pre class="code-block"><code class="language-' + lang + '">' +
-               this.escapeHtml(code.trim()) + '</code></pre>';
+        codeBlock = '<pre class="code-block"><code class="language-' + finalLang + '">' +
+         cleanCode + '</code></pre>';
       }
+
+      // Store the code block and return a placeholder
+      const placeholder = `__CODEBLOCK_${codeBlockIndex}__`;
+      codeBlocks.push(codeBlock);
+      codeBlockIndex++;
+      return placeholder;
     });
 
-    // Convert inline code
-    text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    // Convert inline code (also protect from line break conversion)
+    const inlineCodes = [];
+    let inlineIndex = 0;
+    text = text.replace(/`([^`]+)`/g, (match, code) => {
+      const placeholder = `__INLINECODE_${inlineIndex}__`;
+      inlineCodes.push(`<code class="inline-code">${code}</code>`);
+      inlineIndex++;
+      return placeholder;
+    });
 
     // Convert headers
     text = text.replace(/^### (.*$)/gim, '<h3>$1</h3>');
@@ -169,10 +254,30 @@ class TestDriverWebview {
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
-    // Convert line breaks
+    // Convert line breaks (but not in code blocks)
     text = text.replace(/\n/g, '<br>');
 
+    // Restore code blocks
+    codeBlocks.forEach((block, index) => {
+      text = text.replace(`__CODEBLOCK_${index}__`, block);
+    });
+
+    // Restore inline code
+    inlineCodes.forEach((code, index) => {
+      text = text.replace(`__INLINECODE_${index}__`, code);
+    });
+
     return text;
+  }
+
+  highlightCodeBlocks() {
+    // Use Prism.js to highlight all code blocks
+    if (window.Prism && window.Prism.highlightAll) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        window.Prism.highlightAll();
+      }, 0);
+    }
   }
 
   handleAgentEvent(eventName, data) {
@@ -181,7 +286,17 @@ class TestDriverWebview {
     // Extract the first argument as the main data
     const mainData = data && data.length > 0 ? data[0] : '';
 
+    // Add checkmark to loading spinner when log or narration events come in
+    if (eventName.startsWith('log:') || eventName === 'narration') {
+      this.completeLoadingSpinner();
+    }
+
+    console.log(eventName, mainData);
+
     switch (eventName) {
+      case 'narration':
+        this.showLoadingSpinner(String(mainData));
+        break;
       case 'status':
         this.addMessage(String(mainData), 'status', '⏳');
         break;
@@ -275,12 +390,17 @@ class TestDriverWebview {
 
     // Auto-scroll to bottom
     this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+
+    // Trigger syntax highlighting for any new code blocks
+    this.highlightCodeBlocks();
   }
 
   finalizeStreamingMarkdown(streamId) {
     const stream = this.streamingMessages.get(streamId);
     if (stream) {
       this.streamingMessages.delete(streamId);
+      // Final syntax highlighting pass
+      this.highlightCodeBlocks();
     }
   }
 
@@ -336,8 +456,88 @@ class TestDriverWebview {
     }
   }
 
+  updateFileIndicator(workspaceName, fileName) {
+    const fileIndicator = document.getElementById('fileIndicator');
+    const workspaceNameElement = document.getElementById('workspaceName');
+    const currentFileElement = document.getElementById('currentFile');
+
+    if (fileIndicator && workspaceNameElement && currentFileElement) {
+      workspaceNameElement.textContent = workspaceName;
+      currentFileElement.textContent = fileName;
+      fileIndicator.classList.add('visible');
+    }
+  }
+
+  showRunButton() {
+    const runButtonContainer = document.getElementById('runButtonContainer');
+    if (runButtonContainer) {
+      runButtonContainer.classList.add('visible');
+    }
+  }
+
   focusInput() {
     this.chatInput.focus();
+  }
+
+  showLoadingSpinner(message) {
+    this.hideEmptyState();
+
+    // Complete any existing loading spinner before creating a new one
+    this.completeLoadingSpinner();
+
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'message assistant loading-message';
+    loadingDiv.id = 'loadingSpinner';
+
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'message-avatar';
+    const avatarImg = document.createElement('img');
+    avatarImg.src = window.mediaSrc + '/icon.png';
+    avatarImg.alt = 'TestDriver';
+    avatarDiv.appendChild(avatarImg);
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.innerHTML = `
+      <div class="loading-content">
+        <span class="codicon codicon-loading codicon-modifier-spin"></span>
+        <span class="loading-text">${message}</span>
+      </div>
+    `;
+
+    loadingDiv.appendChild(avatarDiv);
+    loadingDiv.appendChild(contentDiv);
+
+    this.messagesContainer.appendChild(loadingDiv);
+    this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+  }
+
+  removeLoadingSpinner() {
+    const existingSpinner = document.getElementById('loadingSpinner');
+    if (existingSpinner) {
+      existingSpinner.remove();
+    }
+  }
+
+  completeLoadingSpinner() {
+    const existingSpinner = document.getElementById('loadingSpinner');
+    if (existingSpinner) {
+      // Replace the spinner with a checkmark icon
+      const spinnerElement = existingSpinner.querySelector('.codicon-loading');
+      if (spinnerElement) {
+        spinnerElement.className = 'codicon codicon-check';
+      }
+
+      // Remove the ID so new spinners can use it
+      existingSpinner.removeAttribute('id');
+
+      // Optionally fade out the completed message after a short delay
+      setTimeout(() => {
+        if (existingSpinner.parentNode) {
+          existingSpinner.style.opacity = '0.7';
+        }
+      }, 1000);
+    }
   }
 }
 

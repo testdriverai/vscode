@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { showTestDriverExamples, handleChatMessage } from '../commands/chat';
+import { openInBottomGroup } from './layout';
 
 export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'testdriver-sidebar';
@@ -41,8 +42,25 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           await handleChatMessage(message.message, webviewView, this._context);
           break;
         }
+        case 'runTests': {
+          await this._handleRunTests();
+          break;
+        }
       }
     });
+
+    // Listen for active editor changes to update file indicator
+    this._context.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+        if (editor && this._isTestDriverFile(editor.document.uri)) {
+          const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+          if (workspaceFolder) {
+            const fileName = editor.document.uri.fsPath.split('/').pop() || 'test file';
+            this._updateFileIndicator(workspaceFolder.name, fileName);
+          }
+        }
+      })
+    );
   }
 
   public postMessage(message: { command: string; data: string }) {
@@ -51,13 +69,139 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async _checkAndShowExamples(webviewView: vscode.WebviewView) {
-    console.log('_checkAndShowExamples called');
+  private _updateFileIndicator(workspaceName: string, fileName: string) {
+    if (this._view) {
+      this._view.webview.postMessage({
+        command: 'updateFileIndicator',
+        workspaceName: workspaceName,
+        fileName: fileName
+      });
+
+      // Also show the run button container when we have a file
+      this._view.webview.postMessage({
+        command: 'showRunButton'
+      });
+    }
+  }
+
+  private _isTestDriverFile(uri: vscode.Uri): boolean {
+    return uri.fsPath.includes('/testdriver/') &&
+           (uri.fsPath.endsWith('.yml') || uri.fsPath.endsWith('.yaml'));
+  }
+
+  private async _handleRunTests() {
+    try {
+      console.log('Running TestDriver tests for specific file...');
+
+      // Get the target workspace folder
+      const targetWorkspaceFolder = await this._getTargetWorkspaceFolder();
+      if (!targetWorkspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder found to run tests');
+        return;
+      }
+
+      console.log('Target workspace folder:', targetWorkspaceFolder.uri.fsPath);
+
+      // Focus on the Test Explorer first
+      await vscode.commands.executeCommand('workbench.view.testing.focus');
+
+      // First, try to find the active editor file if it's a test file
+      let targetTestFile: vscode.Uri | undefined;
+      const activeEditor = vscode.window.activeTextEditor;
+
+      if (activeEditor &&
+          activeEditor.document.uri.fsPath.includes('/testdriver/') &&
+          (activeEditor.document.uri.fsPath.endsWith('.yml') || activeEditor.document.uri.fsPath.endsWith('.yaml'))) {
+        targetTestFile = activeEditor.document.uri;
+        console.log('Using active editor test file:', targetTestFile.fsPath);
+      }
+
+      // If no active test file, find the most relevant test file
+      if (!targetTestFile) {
+        const testdriverFiles = await vscode.workspace.findFiles(
+          new vscode.RelativePattern(targetWorkspaceFolder, 'testdriver/**/*.{yml,yaml}'),
+          null,
+          10
+        );
+
+        if (testdriverFiles.length > 0) {
+          // Prioritize main test files or use the first one
+          targetTestFile = testdriverFiles.find(file =>
+            file.fsPath.includes('testdriver.yml') || file.fsPath.includes('testdriver.yaml')
+          ) || testdriverFiles[0];
+
+          console.log('Using found test file:', targetTestFile.fsPath);
+
+          // Open the test file in the bottom group (below any VM windows)
+          await openInBottomGroup(targetTestFile, {
+            preview: true
+          });
+        } else {
+          vscode.window.showWarningMessage(`No TestDriver test files found in ${targetWorkspaceFolder.name}`);
+          return;
+        }
+      }
+
+      // Try to run the specific test file using multiple strategies
+      if (targetTestFile) {
+        const fileName = targetTestFile.fsPath.split('/').pop() || 'test file';
+        console.log('Attempting to run test for file:', targetTestFile.fsPath);
+
+        // Update the file indicator
+        this._updateFileIndicator(targetWorkspaceFolder.name, fileName);
+
+        // Send feedback to the webview about which file is being tested
+        if (this._view) {
+          this._view.webview.postMessage({
+            command: 'testFileInfo',
+            fileName: fileName
+          });
+        }
+
+        try {
+          // Strategy 1: Try VS Code's built-in "run current file" command
+          await vscode.commands.executeCommand('testing.runCurrentFile');
+          console.log('Successfully used testing.runCurrentFile');
+          return;
+        } catch (firstError) {
+          console.log('testing.runCurrentFile failed:', firstError);
+        }
+
+        try {
+          // Strategy 2: Try "run at cursor" which runs the test at the current cursor position
+          await vscode.commands.executeCommand('testing.runAtCursor');
+          console.log('Successfully used testing.runAtCursor');
+          return;
+        } catch (secondError) {
+          console.log('testing.runAtCursor failed:', secondError);
+        }
+
+        try {
+          // Strategy 3: Use the testdriver.runTest command specifically
+          await vscode.commands.executeCommand('testdriver.runTest', targetTestFile);
+          console.log('Successfully used testdriver.runTest');
+          return;
+        } catch (thirdError) {
+          console.log('testdriver.runTest failed:', thirdError);
+        }
+
+        // Strategy 4: Fallback to running all tests with the specific file in focus
+        console.log('All specific test commands failed, falling back to testing.runAll with file context');
+        await vscode.commands.executeCommand('testing.runAll');
+      }
+
+    } catch (error) {
+      console.error('Error running tests:', error);
+      vscode.window.showErrorMessage('Failed to run TestDriver tests: ' + (error as Error).message);
+    }
+  }
+
+  private async _getTargetWorkspaceFolder(): Promise<vscode.WorkspaceFolder | undefined> {
     // Get the current workspace folders
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
       console.log('No workspace folders found');
-      return;
+      return undefined;
     }
 
     console.log('Available workspace folders:', workspaceFolders.map(f => f.uri.fsPath));
@@ -70,7 +214,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
     // Find a workspace folder that doesn't have a testdriver folder
     // This prioritizes user project folders over the extension development folder
     let targetWorkspaceFolder = workspaceFolders[0]; // fallback to first
-    let showExamples = false;
 
     for (const folder of workspaceFolders) {
       const testdriverFolderPath = vscode.Uri.file(folder.uri.fsPath + '/testdriver');
@@ -81,38 +224,91 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
         if (!hasTestdriverFolder) {
           targetWorkspaceFolder = folder;
-          showExamples = true;
           break;
         }
       } catch {
-        // Folder doesn't have testdriver directory
+        // Folder doesn't have testdriver directory, prefer this one
         console.log(`Folder ${folder.uri.fsPath} does not have testdriver folder`);
         targetWorkspaceFolder = folder;
-        showExamples = true;
         break;
       }
     }
 
+    // In development mode, prefer the second workspace folder if available (likely the user's project)
+    if (isExtensionDev && workspaceFolders.length > 1) {
+      console.log('Extension development mode detected, using second workspace folder');
+      targetWorkspaceFolder = workspaceFolders[1];
+    }
+
+    console.log('Target workspace folder:', targetWorkspaceFolder.uri.fsPath);
+    return targetWorkspaceFolder;
+  }
+
+  private async _checkAndShowExamples(webviewView: vscode.WebviewView) {
+    console.log('_checkAndShowExamples called');
+
+    const targetWorkspaceFolder = await this._getTargetWorkspaceFolder();
+    if (!targetWorkspaceFolder) {
+      console.log('No workspace folders found');
+      return;
+    }
+
+    // Check if the target workspace folder has a testdriver folder
+    const testdriverFolderPath = vscode.Uri.file(targetWorkspaceFolder.uri.fsPath + '/testdriver');
+    let showExamples = false;
+
+    try {
+      const stat = await vscode.workspace.fs.stat(testdriverFolderPath);
+      const hasTestdriverFolder = stat.type === vscode.FileType.Directory;
+      console.log(`Target folder ${targetWorkspaceFolder.uri.fsPath} has testdriver folder:`, hasTestdriverFolder);
+
+      // Show examples if no testdriver folder exists
+      showExamples = !hasTestdriverFolder;
+    } catch {
+      // Folder doesn't have testdriver directory
+      console.log(`Target folder ${targetWorkspaceFolder.uri.fsPath} does not have testdriver folder`);
+      showExamples = true;
+    }
+
     // In development mode, always show examples for testing purposes
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const isExtensionDev = workspaceFolders?.some(folder =>
+      folder.uri.fsPath.includes('testdriver-vscode-extension')
+    );
+
     if (isExtensionDev && !showExamples) {
       console.log('Extension development mode detected, showing examples for testing');
       showExamples = true;
-      // Use the second workspace folder if available (likely the user's project)
-      if (workspaceFolders.length > 1) {
-        targetWorkspaceFolder = workspaceFolders[1];
-      }
     }
 
     console.log('Target workspace folder:', targetWorkspaceFolder.uri.fsPath);
     console.log('Show examples:', showExamples);
 
-    // If we found a folder without testdriver, show examples
+    // Update file indicator with workspace info
+    this._updateFileIndicator(targetWorkspaceFolder.name, showExamples ? 'Getting started' : 'testdriver.yml');
+
+    // If we should show examples, load them
     if (showExamples) {
       console.log('Loading examples for workspace folder:', targetWorkspaceFolder.uri.fsPath);
       await showTestDriverExamples(targetWorkspaceFolder, webviewView.webview);
       console.log('showTestDriverExamples completed');
     } else {
-      console.log('All workspace folders have testdriver folders, not showing examples');
+      console.log('Target workspace folder has testdriver folder, not showing examples');
+      // Try to find the main test file and update the indicator
+      const testdriverFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(targetWorkspaceFolder, 'testdriver/**/*.{yml,yaml}'),
+        null,
+        5
+      );
+
+      if (testdriverFiles.length > 0) {
+        const mainTestFile = testdriverFiles.find(file =>
+          file.fsPath.includes('testdriver.yml') || file.fsPath.includes('testdriver.yaml')
+        ) || testdriverFiles[0];
+
+        const fileName = mainTestFile.fsPath.split('/').pop() || 'test file';
+        this._updateFileIndicator(targetWorkspaceFolder.name, fileName);
+      }
     }
   }
 
@@ -140,7 +336,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
             background-color: var(--vscode-sideBar-background);
             color: var(--vscode-sideBar-foreground);
             height: 100vh;
@@ -171,6 +366,76 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-sideBarSectionHeader-foreground);
           }
 
+          .file-indicator {
+            padding: 8px 12px;
+            background-color: var(--vscode-editor-background);
+            border-bottom: 1px solid var(--vscode-sideBar-border);
+            flex-shrink: 0;
+            display: none; /* Hidden by default */
+            border-left: 3px solid var(--vscode-testing-runAction);
+          }
+
+          .file-indicator.visible {
+            display: block;
+          }
+
+          .run-button-container {
+            background-color: var(--vscode-editor-background);
+            border-top: 1px solid var(--vscode-sideBar-border);
+            flex-shrink: 0;
+            font-size: 11px;
+            display: none; /* Hidden by default */
+          }
+
+          .run-button-container.visible {
+            display: block;
+          }
+
+          .run-button-top {
+            background-color: var(--vscode-testing-runAction);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 3px;
+            padding: 8px 12px;
+            cursor: pointer;
+            width: 100%;
+          }
+
+          .run-button-top:hover:not(:disabled) {
+            background-color: var(--vscode-button-hoverBackground);
+          }
+
+          .run-button-top:disabled {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            cursor: not-allowed;
+          }
+
+          .file-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+          }
+
+          .file-icon {
+            width: 14px;
+            height: 14px;
+            opacity: 0.8;
+            font-size: 12px;
+          }
+
+          .file-path {
+            color: var(--vscode-textLink-foreground);
+            font-size: 12px;
+          }
+
+          .workspace-name {
+            color: var(--vscode-descriptionForeground);
+            font-size: 12px;
+          }
+
           .chat-container {
             flex: 1;
             display: flex;
@@ -180,9 +445,9 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
           .messages {
             flex: 1;
+            padding: 8px;
             overflow-y: auto;
             overflow-x: hidden; /* Prevent horizontal scrolling */
-            padding: 8px;
             display: flex;
             flex-direction: column;
             gap: 8px;
@@ -202,15 +467,15 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .message.user .message-content {
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+            background-color: transparent; /* Remove background */
+            border: none; /* Remove border */
             margin-left: auto;
           }
 
           .message-avatar {
             width: 16px;
             height: 16px;
-            display: flex;
+            display: none; /* Hide all avatar icons */
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
@@ -230,26 +495,24 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .message-content {
-            background-color: var(--vscode-input-background);
-            border: 1px solid var(--vscode-input-border);
+            background-color: transparent; /* Remove background */
+            border: none; /* Remove border */
             border-radius: 6px;
-            padding: 8px;
-            max-width: calc(100% - 24px);
+            max-width: 100%; /* Use full width since no avatar */
             word-wrap: break-word;
             overflow-wrap: break-word; /* Better word breaking */
-            font-size: 11px;
             line-height: 1.4;
             min-width: 0; /* Allow content to shrink */
           }
 
           .message.status .message-content {
-            background-color: var(--vscode-notifications-background);
-            border-color: var(--vscode-notifications-border);
-            font-style: italic;
+            background-color: transparent; /* Remove background */
+            border: none; /* Remove border */
           }
 
           .message.loading .message-content {
-            background-color: var(--vscode-progressBar-background);
+            background-color: transparent; /* Remove background */
+            border: none; /* Remove border */
             animation: pulse 1.5s infinite;
           }
 
@@ -258,11 +521,21 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             50% { opacity: 1; }
           }
 
+          .loading-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+
+          .loading-text {
+            color: var(--vscode-descriptionForeground);
+          }
+
           .code-block {
             background-color: var(--vscode-textCodeBlock-background);
             border: 1px solid var(--vscode-textBlockQuote-border);
             border-radius: 3px;
-            padding: 6px;
+            padding: 8px; /* Slightly more padding since no message background */
             margin: 4px 0;
             font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
             font-size: 10px;
@@ -287,6 +560,88 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-editor-foreground) !important;
             white-space: pre;
             overflow-wrap: normal;
+          }
+
+          /* Prism.js VS Code theme integration */
+          .code-block pre[class*="language-"] {
+            background: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            border-radius: 0 !important;
+          }
+
+          .code-block code[class*="language-"] {
+            background: none !important;
+            color: var(--vscode-editor-foreground) !important;
+          }
+
+          /* Override Prism.js tokens to use VS Code colors */
+          .token.comment,
+          .token.prolog,
+          .token.doctype,
+          .token.cdata {
+            color: var(--vscode-editor-comment-foreground, #6A9955) !important;
+          }
+
+          .token.property,
+          .token.tag,
+          .token.boolean,
+          .token.number,
+          .token.constant,
+          .token.symbol,
+          .token.deleted {
+            color: var(--vscode-symbolIcon-numberForeground, #B5CEA8) !important;
+          }
+
+          .token.selector,
+          .token.attr-name,
+          .token.string,
+          .token.char,
+          .token.builtin,
+          .token.inserted {
+            color: var(--vscode-symbolIcon-stringForeground, #CE9178) !important;
+          }
+
+          .token.operator,
+          .token.entity,
+          .token.url,
+          .language-css .token.string,
+          .style .token.string {
+            color: var(--vscode-editor-foreground) !important;
+          }
+
+          .token.atrule,
+          .token.attr-value,
+          .token.keyword {
+            color: var(--vscode-symbolIcon-keywordForeground, #569CD6) !important;
+          }
+
+          .token.function,
+          .token.class-name {
+            color: var(--vscode-symbolIcon-functionForeground, #DCDCAA) !important;
+          }
+
+          .token.regex,
+          .token.important,
+          .token.variable {
+            color: var(--vscode-symbolIcon-variableForeground, #9CDCFE) !important;
+          }
+
+          /* VS Code icon styling */
+          .codicon {
+            font-family: "codicon";
+            font-size: inherit;
+          }
+
+          /* Loading spinner should be neutral colored */
+          .codicon-loading {
+            color: var(--vscode-progressBar-background, var(--vscode-foreground)) !important;
+          }
+
+          /* Success checkmark should be green */
+          .codicon-check {
+            color: var(--vscode-debugIcon-startForeground) !important;
           }
 
           .inline-code {
@@ -315,8 +670,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border: 1px solid var(--vscode-input-border);
             border-radius: 3px;
             padding: 6px;
-            font-family: inherit;
-            font-size: 11px;
+            font-size: 12px;
             resize: vertical;
             min-height: 32px;
             max-height: 80px;
@@ -335,8 +689,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
             padding: 6px 12px;
             cursor: pointer;
-            font-family: inherit;
-            font-size: 11px;
+            font-size: 12px;
             width: 100%;
             height: 28px;
           }
@@ -346,6 +699,21 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .send-button:disabled {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            cursor: not-allowed;
+          }
+
+          #runButton {
+            background-color: var(--vscode-testing-runAction);
+            margin-top: 6px;
+          }
+
+          #runButton:hover:not(:disabled) {
+            background-color: var(--vscode-button-hoverBackground);
+          }
+
+          #runButton:disabled {
             background-color: var(--vscode-button-secondaryBackground);
             color: var(--vscode-button-secondaryForeground);
             cursor: not-allowed;
@@ -375,7 +743,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .empty-state p {
-            font-size: 11px;
+            font-size: 12px;
             line-height: 1.4;
             margin-bottom: 12px;
           }
@@ -394,7 +762,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
             padding: 4px 6px;
             cursor: pointer;
-            font-family: inherit;
             font-size: 10px;
             text-align: left;
             line-height: 1.3;
@@ -413,7 +780,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
           .examples-selection p {
             margin: 0 0 12px 0;
-            font-size: 11px;
+            font-size: 12px;
             color: var(--vscode-descriptionForeground);
           }
 
@@ -431,7 +798,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border-radius: 4px;
             padding: 12px 8px;
             cursor: pointer;
-            font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
             text-align: center;
             transition: background-color 0.1s ease;
           }
@@ -441,8 +807,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .example-name {
-            font-size: 11px;
-            font-weight: 600;
+            font-size: 12px;
           }
 
           .examples-note {
@@ -517,15 +882,18 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           <div class="title">TestDriver</div>
         </div>
 
+        <div class="file-indicator" id="fileIndicator">
+          <div class="file-info">
+            <span class="file-path" id="currentFile">No file selected</span>
+          </div>
+        </div>
+
         <div class="chat-container">
           <div class="messages" id="messages">
             <div class="empty-state" id="emptyState">
               <img src="${mediaSrc}/icon.png" alt="TestDriver" class="helmet-large" />
-              <h3>TestDriver Chat</h3>
-              <p>Interactive TestDriver commands and exploration.</p>
+              <h3>TestDriver.ai</h3>
               <div class="example-prompts" id="examplePrompts">
-                <!-- Examples will be dynamically loaded here -->
-                <div id="loadingExamples">Loading examples...</div>
               </div>
             </div>
           </div>
@@ -536,9 +904,29 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
                 placeholder="What would you like to test?"
                 style="flex: 1; padding: 12px; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--vscode-input-foreground); resize: none; border-radius: 4px; font-family: var(--vscode-font-family); line-height: 1.3; min-height: 20px; max-height: 80px; overflow-y: auto;"
               ></textarea>
-            <button id="sendButton" class="send-button">Send</button>
+            <button id="sendButton" class="send-button">Add Test Step</button>
+          </div>
+
+          <div class="run-button-container" id="runButtonContainer">
+            <button id="runButtonTop" class="run-button-top">Run From Start</button>
           </div>
         </div>
+
+        <!-- Prism.js for syntax highlighting -->
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet" />
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css" rel="stylesheet" media="(prefers-color-scheme: dark)" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+        <!-- VS Code Codicons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.33/dist/codicon.css">
+
+        <script>
+          // Configure Prism.js autoloader
+          if (window.Prism) {
+            window.Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+          }
+        </script>
 
         <script>
           // Set up global variables for the webview

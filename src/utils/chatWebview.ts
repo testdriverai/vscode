@@ -1,11 +1,15 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { ensureVerticalLayout } from './layout';
 
-export function createChatWebview(_context: vscode.ExtensionContext): vscode.WebviewPanel {
+export async function createChatWebview(_context: vscode.ExtensionContext): Promise<vscode.WebviewPanel> {
+  // Ensure we have vertical layout first
+  await ensureVerticalLayout();
+
   const panel = vscode.window.createWebviewPanel(
     'testdriverChat',
     'TestDriver Chat',
-    vscode.ViewColumn.Active,
+    vscode.ViewColumn.Two, // Open in second column (bottom)
     {
       enableScripts: true,
       retainContextWhenHidden: true,
@@ -45,7 +49,7 @@ function getChatHtml(mediaSrc: vscode.Uri): string {
         }
 
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+          font-size: 14px;
           background-color: var(--vscode-editor-background);
           color: var(--vscode-editor-foreground);
           height: 100vh;
@@ -98,11 +102,11 @@ function getChatHtml(mediaSrc: vscode.Uri): string {
 
         .message.user {
           flex-direction: row-reverse;
+          background-color: var(--vscode-chat-requestBubbleBackground);
+          color: var(--vscode-button-foreground);
         }
 
         .message.user .message-content {
-          background-color: var(--vscode-button-background);
-          color: var(--vscode-button-foreground);
           margin-left: auto;
         }
 
@@ -126,7 +130,7 @@ function getChatHtml(mediaSrc: vscode.Uri): string {
           background-color: var(--vscode-input-background);
           border: 1px solid var(--vscode-input-border);
           border-radius: 8px;
-          padding: 12px;
+          padding: 4px;
           max-width: 70%;
           word-wrap: break-word;
         }

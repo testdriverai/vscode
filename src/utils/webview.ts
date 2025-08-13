@@ -1,12 +1,16 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { ensureVerticalLayout } from './layout';
 
-export function openTestDriverWebview(url: string, title = 'TestDriver') {
+export async function openTestDriverWebview(url: string, title = 'TestDriver') {
   // Hide terminal if it's open
-  vscode.commands.executeCommand('workbench.action.terminal.toggleTerminal').then(() => {
+  await vscode.commands.executeCommand('workbench.action.terminal.toggleTerminal').then(() => {
     // Check if terminal is visible and hide it
     vscode.commands.executeCommand('workbench.action.closePanel');
   });
+
+  // Ensure we have a vertical layout where webview will be on top
+  await ensureVerticalLayout();
 
   const panel = vscode.window.createWebviewPanel(
     'testdriverWebview',

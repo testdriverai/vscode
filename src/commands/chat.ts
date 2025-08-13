@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { createChatWebview } from '../utils/chatWebview';
 import { openTestDriverWebview } from '../utils/webview';
+import { openInBottomGroup } from '../utils/layout';
 import { track, logger } from '../utils/logger';
 
 // Import dotenv to load environment variables
@@ -158,11 +159,15 @@ async function openAndHighlightFile(filePath: string, lineNumber?: number, colum
     }
 
     // Open the file in the bottom panel (below VM window)
-    const document = await vscode.window.showTextDocument(fileUri, {
-      viewColumn: vscode.ViewColumn.Two, // Bottom panel
+    const document = await openInBottomGroup(fileUri, {
       preview: false,
       preserveFocus: false
     });
+
+    if (!document) {
+      console.error('Could not open document in bottom group');
+      return;
+    }
 
     console.log(`Successfully opened file: ${filePath}`);
 
@@ -235,7 +240,7 @@ export function registerChatCommand(context: vscode.ExtensionContext) {
   const disposable = vscode.commands.registerCommand('testdriver.openChat', async () => {
     track({ event: 'chat.opened' });
 
-    const panel = createChatWebview(context);
+    const panel = await createChatWebview(context);
 
     // Handle messages from the webview
     panel.webview.onDidReceiveMessage(
@@ -485,17 +490,16 @@ async function copyExampleToWorkspace(exampleName: string, workspaceFolder: vsco
       throw new Error(`Example not found: ${exampleName}`);
     }
 
-    // Open the main test file
+    // Open the main test file in bottom group
     const mainTestFile = path.join(workspaceTestdriverPath, mainFileName);
-    await vscode.window.showTextDocument(vscode.Uri.file(mainTestFile), {
-      viewColumn: vscode.ViewColumn.One,
+    await openInBottomGroup(vscode.Uri.file(mainTestFile), {
       preview: false
     });
 
     webview.postMessage({
       command: 'agentEvent',
       eventName: 'log:info',
-      data: [`✅ Copied ${exampleName} example to testdriver/ folder and opened it for editing.`]
+      data: [`Copied ${exampleName} example to testdriver/ folder and opened it for editing.`]
     });
 
     webview.postMessage({
@@ -755,8 +759,7 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
       }
 
       try {
-        await vscode.window.showTextDocument(testFileUri, {
-          viewColumn: vscode.ViewColumn.Two, // Open below the VM window
+        await openInBottomGroup(testFileUri, {
           preview: false
         });
       } catch (error) {
@@ -766,8 +769,7 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
           const testDir = path.dirname(testFilePath);
           await vscode.workspace.fs.createDirectory(vscode.Uri.file(testDir));
           await vscode.workspace.fs.writeFile(testFileUri, new TextEncoder().encode(''));
-          await vscode.window.showTextDocument(testFileUri, {
-            viewColumn: vscode.ViewColumn.Two, // Open below the VM window
+          await openInBottomGroup(testFileUri, {
             preview: false
           });
         } catch (createError) {

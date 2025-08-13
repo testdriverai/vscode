@@ -378,8 +378,6 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                 outputChannel.appendLine(`[${agent.emitter.event}] ${message}`);
               });
 
-
-
             // Allow any type for message
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const sendToSandbox = (message: any) => {
@@ -539,11 +537,11 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
             });
 
             // Listen for show-window event to open TestDriver webview
-            agent.emitter.on('show-window', (url: string) => {
+            agent.emitter.on('show-window', async (url: string) => {
                 // Use the test file name as the webview title
                 const testFileName = test.label || 'TestDriver';
 
-                openTestDriverWebview(url, `${testFileName} - TestDriver`);
+                await openTestDriverWebview(url, `${testFileName} - TestDriver`);
 
             });
 
