@@ -187,6 +187,34 @@ class TestDriverWebview {
       codeBlock.className = 'code-block';
       codeBlock.innerHTML = content;
       contentDiv.appendChild(codeBlock);
+    } else if (type === 'error') {
+      // Format error messages in monospace with proper formatting
+      let formattedContent = content;
+      
+      // Try to detect and format JSON error messages
+      try {
+        // Check if content looks like JSON
+        if (content.includes('{') && content.includes('}')) {
+          // Extract and format JSON portions
+          formattedContent = content.replace(/(\{[^}]*\})/g, (match) => {
+            try {
+              const parsed = JSON.parse(match);
+              return JSON.stringify(parsed, null, 2);
+            } catch {
+              return match;
+            }
+          });
+        }
+      } catch (e) {
+        // If formatting fails, use original content
+        formattedContent = content;
+      }
+      
+      // Escape HTML but preserve line breaks
+      const div = document.createElement('div');
+      div.textContent = formattedContent;
+      const escapedContent = div.innerHTML.replace(/\n/g, '<br>');
+      contentDiv.innerHTML = escapedContent;
     } else {
       contentDiv.innerHTML = content;
     }

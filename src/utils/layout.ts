@@ -11,7 +11,7 @@ export async function ensureVerticalLayout(): Promise<void> {
 
     // First, ensure we're in a single editor group state
     await vscode.commands.executeCommand('workbench.action.editorLayoutSingle');
-    
+
     // Give a small delay for the layout reset to take effect
     await new Promise(resolve => setTimeout(resolve, 50));
 

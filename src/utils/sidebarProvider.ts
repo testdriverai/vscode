@@ -514,6 +514,20 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             animation: pulse 1.5s infinite;
           }
 
+          .message.error .message-content {
+            background-color: var(--vscode-textCodeBlock-background);
+            border: 1px solid var(--vscode-errorForeground, #f14c4c);
+            border-left: 3px solid var(--vscode-errorForeground, #f14c4c);
+            border-radius: 3px;
+            padding: 8px;
+            font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
+            font-size: 11px;
+            color: var(--vscode-errorForeground, #f14c4c);
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+          }
+
           @keyframes pulse {
             0%, 100% { opacity: 0.6; }
             50% { opacity: 1; }
