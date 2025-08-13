@@ -772,10 +772,6 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
       console.log('Starting agent...');
       await agent.start();
 
-      // Build the environment (sandbox) for interactive mode
-      console.log('Building environment...');
-      await agent.buildEnv({ });
-
       // Open the test file being edited (relative to workspace)
       const testFilePath = path.join(workingDir, 'testdriver', 'testdriver.yaml');
       const testFileUri = vscode.Uri.file(testFilePath);
