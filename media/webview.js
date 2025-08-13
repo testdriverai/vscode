@@ -287,14 +287,14 @@ class TestDriverWebview {
     const mainData = data && data.length > 0 ? data[0] : '';
 
     // Add checkmark to loading spinner when log or narration events come in
-    if (eventName.startsWith('log:') || eventName === 'narration') {
+    if (eventName.startsWith('log:')) {
       this.completeLoadingSpinner();
     }
 
     console.log(eventName, mainData);
 
     switch (eventName) {
-      case 'narration':
+      case 'log:narration':
         this.showLoadingSpinner(String(mainData));
         break;
       case 'status':

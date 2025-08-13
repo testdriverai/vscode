@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TestDriver Chat</title>
+  <link rel="stylesheet" href="{MEDIA_URI}/styles.css">
+</head>
+<body>
+  <div class="header">
+    <img src="{MEDIA_URI}/icon.png" alt="TestDriver" class="helmet-icon" />
+    <div class="title">TestDriver Chat</div>
+  </div>
+
+  <div class="chat-container">
+    <div class="messages" id="messages">
+      <div class="empty-state" id="emptyState">
+        <img src="{MEDIA_URI}/icon.png" alt="TestDriver" class="helmet-large" />
+        <h3>Welcome to TestDriver Chat</h3>
+        <p>Start a conversation with TestDriver to automate your testing and QA tasks.</p>
+        <div class="example-prompts" id="examplePrompts">
+          <button class="example-prompt" onclick="useExample('Test the login flow on my application')">
+            Test the login flow on my application
+          </button>
+          <button class="example-prompt" onclick="useExample('Create a test for the shopping cart feature')">
+            Create a test for the shopping cart feature
+          </button>
+          <button class="example-prompt" onclick="useExample('Help me debug this failing test')">
+            Help me debug this failing test
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-container">
+      <div class="input-wrapper">
+        <textarea
+          id="chatInput"
+          class="chat-input"
+          placeholder="Type your message to TestDriver..."
+          rows="1"
+        ></textarea>
+      </div>
+      <button id="sendButton" class="send-button">Send</button>
+    </div>
+  </div>
+
+  <script>
+    window.mediaSrc = "{MEDIA_URI}";
+    const vscode = acquireVsCodeApi();
+  </script>
+  <script src="{MEDIA_URI}/webview.js"></script>
+</body>
+</html>
