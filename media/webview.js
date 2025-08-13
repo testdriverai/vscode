@@ -75,6 +75,15 @@ class TestDriverWebview {
         case 'showRunButton':
           this.showRunButton();
           break;
+        case 'hideRunButton':
+          this.hideRunButton();
+          break;
+        case 'hideInputAndRunButton':
+          this.hideInputAndRunButton();
+          break;
+        case 'showInputAndRunButton':
+          this.showInputAndRunButton();
+          break;
         case 'error':
           this.addMessage(message.data, 'error', '❌');
           this.isRunning = false;
@@ -287,14 +296,14 @@ class TestDriverWebview {
     const mainData = data && data.length > 0 ? data[0] : '';
 
     // Add checkmark to loading spinner when log or narration events come in
-    if (eventName.startsWith('log:') || eventName === 'narration') {
+    if (eventName.startsWith('log:')) {
       this.completeLoadingSpinner();
     }
 
     console.log(eventName, mainData);
 
     switch (eventName) {
-      case 'narration':
+      case 'log:narration':
         this.showLoadingSpinner(String(mainData));
         break;
       case 'status':
@@ -470,6 +479,37 @@ class TestDriverWebview {
 
   showRunButton() {
     const runButtonContainer = document.getElementById('runButtonContainer');
+    if (runButtonContainer) {
+      runButtonContainer.classList.add('visible');
+    }
+  }
+
+  hideRunButton() {
+    const runButtonContainer = document.getElementById('runButtonContainer');
+    if (runButtonContainer) {
+      runButtonContainer.classList.remove('visible');
+    }
+  }
+
+  hideInputAndRunButton() {
+    const inputContainer = document.querySelector('.input-container');
+    const runButtonContainer = document.getElementById('runButtonContainer');
+
+    if (inputContainer) {
+      inputContainer.style.display = 'none';
+    }
+    if (runButtonContainer) {
+      runButtonContainer.classList.remove('visible');
+    }
+  }
+
+  showInputAndRunButton() {
+    const inputContainer = document.querySelector('.input-container');
+    const runButtonContainer = document.getElementById('runButtonContainer');
+
+    if (inputContainer) {
+      inputContainer.style.display = 'flex';
+    }
     if (runButtonContainer) {
       runButtonContainer.classList.add('visible');
     }

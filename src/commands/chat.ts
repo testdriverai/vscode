@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { createChatWebview } from '../utils/chatWebview';
 import { openTestDriverWebview } from '../utils/webview';
 import { openInBottomGroup } from '../utils/layout';
 import { track, logger } from '../utils/logger';
@@ -20,6 +19,12 @@ const AnsiToHtml = require('ansi-to-html');
 // Import Node.js fs module for reading directories
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs');
+
+// Global agent instance to reuse across chat messages
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let globalAgent: any = null;
+let globalWebview: vscode.Webview | vscode.WebviewView['webview'] | null = null;
+let isAgentInitialized = false;
 
 // Get examples from testdriverai package using fs
 let testdriverExamples: string[] = [];
@@ -240,20 +245,8 @@ export function registerChatCommand(context: vscode.ExtensionContext) {
   const disposable = vscode.commands.registerCommand('testdriver.openChat', async () => {
     track({ event: 'chat.opened' });
 
-    const panel = await createChatWebview(context);
-
-    // Handle messages from the webview
-    panel.webview.onDidReceiveMessage(
-      async message => {
-        switch (message.command) {
-          case 'sendMessage':
-            await handleChatMessage(message.message, panel, context);
-            break;
-        }
-      },
-      undefined,
-      context.subscriptions
-    );
+    // Focus on the TestDriver sidebar view instead of creating a separate webview panel
+    await vscode.commands.executeCommand('testdriver-sidebar.focus');
   });
 
   context.subscriptions.push(disposable);
@@ -502,6 +495,18 @@ async function copyExampleToWorkspace(exampleName: string, workspaceFolder: vsco
       data: [`Copied ${exampleName} example to testdriver/ folder and opened it for editing.`]
     });
 
+    // Show the input and run buttons now that we have a testdriver folder
+    webview.postMessage({
+      command: 'showInputAndRunButton'
+    });
+
+    // Update the file indicator to show the new test file
+    webview.postMessage({
+      command: 'updateFileIndicator',
+      workspaceName: workspaceFolder.name,
+      fileName: mainFileName
+    });
+
     webview.postMessage({
       command: 'chatResponse'
     });
@@ -519,7 +524,232 @@ async function copyExampleToWorkspace(exampleName: string, workspaceFolder: vsco
   }
 }
 
-export { handleChatMessage, showTestDriverExamples };
+export { handleChatMessage, showTestDriverExamples, resetAgent };
+
+/**
+ * Reset the global TestDriver agent instance (useful for cleanup or starting fresh)
+ */
+function resetAgent(): void {
+  if (globalAgent) {
+    try {
+      // Try to gracefully stop the agent if it has a stop method
+      if (typeof globalAgent.stop === 'function') {
+        globalAgent.stop();
+      }
+    } catch (error) {
+      console.log('Error stopping agent:', error);
+    }
+  }
+
+  globalAgent = null;
+  globalWebview = null;
+  isAgentInitialized = false;
+  console.log('TestDriver agent instance reset');
+}
+
+/**
+ * Initialize or reuse the global TestDriver agent instance
+ */
+async function initializeOrReuseAgent(
+  workspaceFolder: vscode.WorkspaceFolder,
+  apiKey: string,
+  webview: vscode.Webview | vscode.WebviewView['webview']
+): Promise<any> {
+  // If agent already exists and is initialized, reuse it
+  if (globalAgent && isAgentInitialized) {
+    console.log('Reusing existing TestDriver agent instance');
+    globalWebview = webview; // Update webview reference in case it changed
+    return globalAgent;
+  }
+
+  console.log('Creating new TestDriver agent instance');
+
+  const originalCwd: string = process.cwd();
+
+  try {
+    // Change process working directory to the workspace folder
+    process.chdir(workspaceFolder.uri.fsPath);
+
+    // Prepare environment variables for the agent
+    const agentEnvironment = {
+      TD_API_KEY: apiKey,
+      ...process.env
+    };
+
+    // Set working directory to the workspace folder
+    const workingDir = workspaceFolder.uri.fsPath;
+
+    // Set up CLI args for the agent in "edit" mode (interactive mode)
+    const cliArgs = {
+      command: 'edit',
+      args: ['testdriver/testdriver.yaml'],
+      options: {
+        new: true
+      },
+    };
+
+    console.log('CLI args being passed to agent:', JSON.stringify(cliArgs, null, 2));
+
+    // Create agent with environment and CLI args
+    globalAgent = new TestDriverAgent(agentEnvironment, cliArgs);
+    globalWebview = webview;
+
+    console.log('Created agent with configuration:', {
+      environment: agentEnvironment.TD_API_KEY ? 'API key present' : 'No API key',
+      workingDir: workingDir,
+      agentWorkingDir: globalAgent.workingDir,
+      agentCliArgs: globalAgent.cliArgs
+    });
+
+    // Create ANSI to HTML converter
+    const ansiConverter = createAnsiConverter();
+
+    // Unified event forwarding - listen to all events and forward them to webview
+    globalAgent.emitter.onAny((eventName: string, ...args: any[]) => {
+      console.log('Received agent event:', eventName, args);
+
+      // Process ANSI codes in the event data
+      const processedArgs = processEventData(args, ansiConverter);
+
+      if (globalWebview) {
+        globalWebview.postMessage({
+          command: 'agentEvent',
+          eventName: eventName,
+          data: processedArgs,
+          timestamp: Date.now()
+        });
+      }
+    });
+
+    // Handle step:start events to open and highlight files
+    globalAgent.emitter.on('step:start', async (data: EventData) => {
+      console.log('Step started - full data:', JSON.stringify(data, null, 2));
+
+      if (data.sourcePosition && data.sourcePosition.filePath) {
+        const sourcePos = data.sourcePosition;
+        const step = sourcePos.step;
+
+        if (step) {
+          console.log('Opening file for step:', sourcePos.filePath, 'line:', step.startLine);
+          await openAndHighlightFile(sourcePos.filePath, step.startLine, step.startColumn);
+        } else {
+          console.log('Opening file for step (fallback):', sourcePos.filePath);
+          await openAndHighlightFile(sourcePos.filePath);
+        }
+      } else {
+        console.log('No source position found in step data');
+      }
+    });
+
+    // Handle command:start events to open and highlight files
+    globalAgent.emitter.on('command:start', async (data: EventData) => {
+      console.log('Command started - full data:', JSON.stringify(data, null, 2));
+
+      if (data.sourcePosition && data.sourcePosition.filePath) {
+        const sourcePos = data.sourcePosition;
+        const command = sourcePos.command;
+
+        if (command) {
+          console.log('Opening file for command:', sourcePos.filePath, 'line:', command.startLine);
+          await openAndHighlightFile(sourcePos.filePath, command.startLine, command.startColumn);
+        } else {
+          console.log('Opening file for command (fallback):', sourcePos.filePath);
+          await openAndHighlightFile(sourcePos.filePath);
+        }
+      } else {
+        console.log('No source position found in command data');
+      }
+    });
+
+    // Handle exit event separately for special processing
+    globalAgent.emitter.on('exit', (code: number | null) => {
+      console.log('TestDriver agent exited with code:', code);
+
+      // Reset global state
+      globalAgent = null;
+      isAgentInitialized = false;
+
+      if (globalWebview) {
+        globalWebview.postMessage({
+          command: 'chatResponse'
+        });
+
+        if (code !== 0) {
+          globalWebview.postMessage({
+            command: 'error',
+            data: `Chat session ended with exit code ${code}`
+          });
+          track({
+            event: 'chat.session.failed',
+            properties: { exitCode: code },
+          });
+        } else {
+          track({
+            event: 'chat.session.completed',
+          });
+        }
+      }
+
+      // Clear webview reference after handling messages
+      globalWebview = null;
+    });
+
+    // Handle show-window event to open TestDriver webview instead of external browser
+    globalAgent.emitter.on('show-window', async (url: string) => {
+      const testFileName = 'TestDriver Session';
+      await openTestDriverWebview(url, `${testFileName} - TestDriver`);
+    });
+
+    // Start the agent first
+    console.log('Starting agent...');
+    await globalAgent.start();
+
+    // Build the environment (sandbox) for interactive mode
+    console.log('Building environment...');
+    await globalAgent.buildEnv({ new: true });
+
+    // Open the test file being edited (relative to workspace)
+    const testFilePath = path.join(workingDir, 'testdriver', 'testdriver.yaml');
+    const testFileUri = vscode.Uri.file(testFilePath);
+
+    // Hide terminal when opening test files
+    try {
+      await vscode.commands.executeCommand('workbench.action.closePanel');
+    } catch {
+      // Ignore if panel is already closed
+    }
+
+    try {
+      await openInBottomGroup(testFileUri, {
+        preview: false
+      });
+    } catch (error) {
+      console.log('Could not open test file:', error);
+      // If file doesn't exist, create it
+      try {
+        const testDir = path.dirname(testFilePath);
+        await vscode.workspace.fs.createDirectory(vscode.Uri.file(testDir));
+        await vscode.workspace.fs.writeFile(testFileUri, new TextEncoder().encode(''));
+        await openInBottomGroup(testFileUri, {
+          preview: false
+        });
+      } catch (createError) {
+        console.log('Could not create test file:', createError);
+      }
+    }
+
+    isAgentInitialized = true;
+    return globalAgent;
+
+  } catch (error) {
+    // Reset global state on error
+    globalAgent = null;
+    globalWebview = null;
+    isAgentInitialized = false;
+
+    throw error;
+  }
+}
 
 async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel | vscode.WebviewView, context: vscode.ExtensionContext) {
   try {
@@ -599,183 +829,10 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
       return;
     }
 
-    const originalCwd: string = process.cwd();
-
     try {
-      // Change process working directory to the workspace folder
-      process.chdir(workspaceFolder.uri.fsPath);
-
-      // Prepare environment variables for the agent
-      const agentEnvironment = {
-        TD_API_KEY: apiKey,
-        ...process.env // Include other environment variables
-      };
-
-      // Set working directory to the workspace folder
-      const workingDir = workspaceFolder.uri.fsPath;
-
-      // Set up CLI args for the agent in "edit" mode (interactive mode)
-      // This is like running: npx testdriverai@latest edit (which enters interactive mode)
-      const cliArgs = {
-        command: 'edit',
-        args: ['testdriver/testdriver.yaml'], // Use relative path from workspace root
-        options: {
-          new: true
-        },
-      };
-
-      console.log('CLI args being passed to agent:', JSON.stringify(cliArgs, null, 2));
-
-      // Create agent with environment and CLI args
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const agent: any = new TestDriverAgent(agentEnvironment, cliArgs);
-
-      console.log('Created agent with configuration:', {
-        environment: agentEnvironment.TD_API_KEY ? 'API key present' : 'No API key',
-        workingDir: workingDir,
-        agentWorkingDir: agent.workingDir,
-        agentCliArgs: agent.cliArgs
-      });
-
-      // Track that we're running a chat session
-      let chatEnded = false;
-
-      // Create ANSI to HTML converter
-      const ansiConverter = createAnsiConverter();
-
-      // Unified event forwarding - listen to all events and forward them to webview
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      agent.emitter.onAny((eventName: string, ...args: any[]) => {
-        console.log('Received agent event:', eventName, args);
-
-        // Process ANSI codes in the event data
-        const processedArgs = processEventData(args, ansiConverter);
-
-        const webview = 'webview' in panel ? panel.webview : panel;
-        webview.postMessage({
-          command: 'agentEvent',
-          eventName: eventName,
-          data: processedArgs,
-          timestamp: Date.now()
-        });
-      });
-
-            // Handle step:start events to open and highlight files
-      agent.emitter.on('step:start', async (data: EventData) => {
-        console.log('Step started - full data:', JSON.stringify(data, null, 2));
-
-        if (data.sourcePosition && data.sourcePosition.filePath) {
-          const sourcePos = data.sourcePosition;
-          const step = sourcePos.step;
-
-          if (step) {
-            console.log('Opening file for step:', sourcePos.filePath, 'line:', step.startLine);
-            await openAndHighlightFile(sourcePos.filePath, step.startLine, step.startColumn);
-          } else {
-            console.log('Opening file for step (fallback):', sourcePos.filePath);
-            await openAndHighlightFile(sourcePos.filePath);
-          }
-        } else {
-          console.log('No source position found in step data');
-        }
-      });
-
-      // Handle command:start events to open and highlight files
-      agent.emitter.on('command:start', async (data: EventData) => {
-        console.log('Command started - full data:', JSON.stringify(data, null, 2));
-
-        if (data.sourcePosition && data.sourcePosition.filePath) {
-          const sourcePos = data.sourcePosition;
-          const command = sourcePos.command;
-
-          if (command) {
-            console.log('Opening file for command:', sourcePos.filePath, 'line:', command.startLine);
-            await openAndHighlightFile(sourcePos.filePath, command.startLine, command.startColumn);
-          } else {
-            console.log('Opening file for command (fallback):', sourcePos.filePath);
-            await openAndHighlightFile(sourcePos.filePath);
-          }
-        } else {
-          console.log('No source position found in command data');
-        }
-      });
-
-      // Handle exit event separately for special processing
-      agent.emitter.on('exit', (code: number | null) => {
-        console.log('TestDriver agent exited with code:', code);
-
-        // Restore original working directory
-        process.chdir(originalCwd);
-
-        if (!chatEnded) {
-          chatEnded = true;
-          const webview = 'webview' in panel ? panel.webview : panel;
-          webview.postMessage({
-            command: 'chatResponse'
-          });
-        }
-
-        if (code !== 0) {
-          const webview = 'webview' in panel ? panel.webview : panel;
-          webview.postMessage({
-            command: 'error',
-            data: `Chat session ended with exit code ${code}`
-          });
-          track({
-            event: 'chat.session.failed',
-            properties: { exitCode: code },
-          });
-        } else {
-          track({
-            event: 'chat.session.completed',
-          });
-        }
-      });
-
-      // Handle show-window event to open TestDriver webview instead of external browser
-      agent.emitter.on('show-window', async (url: string) => {
-        // Use the test file name as the webview title
-        const testFileName = 'TestDriver Session';
-        await openTestDriverWebview(url, `${testFileName} - TestDriver`);
-      });
-
-      // Start the agent first
-      console.log('Starting agent...');
-      await agent.start();
-
-      // Build the environment (sandbox) for interactive mode
-      console.log('Building environment...');
-      await agent.buildEnv({ new: true });
-
-      // Open the test file being edited (relative to workspace)
-      const testFilePath = path.join(workingDir, 'testdriver', 'testdriver.yaml');
-      const testFileUri = vscode.Uri.file(testFilePath);
-
-      // Hide terminal when opening test files
-      try {
-        await vscode.commands.executeCommand('workbench.action.closePanel');
-      } catch {
-        // Ignore if panel is already closed
-      }
-
-      try {
-        await openInBottomGroup(testFileUri, {
-          preview: false
-        });
-      } catch (error) {
-        console.log('Could not open test file:', error);
-        // If file doesn't exist, create it
-        try {
-          const testDir = path.dirname(testFilePath);
-          await vscode.workspace.fs.createDirectory(vscode.Uri.file(testDir));
-          await vscode.workspace.fs.writeFile(testFileUri, new TextEncoder().encode(''));
-          await openInBottomGroup(testFileUri, {
-            preview: false
-          });
-        } catch (createError) {
-          console.log('Could not create test file:', createError);
-        }
-      }
+      // Initialize or reuse the existing TestDriver agent
+      const webview = 'webview' in panel ? panel.webview : panel;
+      const agent = await initializeOrReuseAgent(workspaceFolder, apiKey, webview);
 
       // Now handle the user message like readline does
       console.log('Processing user message:', userMessage);
@@ -858,9 +915,6 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-
-      // Restore original working directory
-      process.chdir(originalCwd);
 
       // Check for API key errors and show popup
       if (errorMessage.includes('API KEY') || errorMessage.includes('API_KEY_MISSING_OR_INVALID')) {

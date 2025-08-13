@@ -76,11 +76,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
         workspaceName: workspaceName,
         fileName: fileName
       });
-
-      // Also show the run button container when we have a file
-      this._view.webview.postMessage({
-        command: 'showRunButton'
-      });
     }
   }
 
@@ -292,8 +287,19 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
       console.log('Loading examples for workspace folder:', targetWorkspaceFolder.uri.fsPath);
       await showTestDriverExamples(targetWorkspaceFolder, webviewView.webview);
       console.log('showTestDriverExamples completed');
+
+      // Hide both the input area and run button when showing examples
+      webviewView.webview.postMessage({
+        command: 'hideInputAndRunButton'
+      });
     } else {
       console.log('Target workspace folder has testdriver folder, not showing examples');
+
+      // Show the input area and run button when not showing examples
+      webviewView.webview.postMessage({
+        command: 'showInputAndRunButton'
+      });
+
       // Try to find the main test file and update the indicator
       const testdriverFiles = await vscode.workspace.findFiles(
         new vscode.RelativePattern(targetWorkspaceFolder, 'testdriver/**/*.{yml,yaml}'),
