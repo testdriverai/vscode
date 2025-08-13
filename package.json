@@ -80,18 +80,6 @@
             ]
           },
           {
-            "id": "clone",
-            "title": "Try an example",
-            "description": "Get set up quickly by cloning ready made examples.\n[Add Examples to this Workspace](command:testdriver.cloneExample)",
-            "media": {
-              "image": "media/main.png",
-              "altText": "TestDriver examples setup"
-            },
-            "completionEvents": [
-              "command:testdriver.cloneExample"
-            ]
-          },
-          {
             "id": "runTest",
             "title": "Run your tests!",
             "description": "Open the VS Code Test Explorer to see and run a test by clicking the play button.\n[Open Test Panel](command:testdriver.runTest)",
@@ -199,7 +187,7 @@
     "dotenv": "^16.4.5",
     "prismjs": "^1.30.0",
     "strip-ansi": "^7.1.0",
-    "testdriverai": "^6.0.16-canary.72de3e0.0",
+    "testdriverai": "^6.0.16-canary.781656a.0",
     "vscode-languageclient": "^9.0.0",
     "winston": "^3.17.0"
   },
