@@ -190,7 +190,7 @@ class TestDriverWebview {
     } else if (type === 'error') {
       // Format error messages in monospace with proper formatting
       let formattedContent = content;
-      
+
       // Try to detect and format JSON error messages
       try {
         // Check if content looks like JSON
@@ -209,7 +209,7 @@ class TestDriverWebview {
         // If formatting fails, use original content
         formattedContent = content;
       }
-      
+
       // Escape HTML but preserve line breaks
       const div = document.createElement('div');
       div.textContent = formattedContent;

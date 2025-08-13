@@ -501,6 +501,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             overflow-wrap: break-word; /* Better word breaking */
             line-height: 1.4;
             min-width: 0; /* Allow content to shrink */
+            padding: 6px;
           }
 
           .message.status .message-content {

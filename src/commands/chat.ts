@@ -765,7 +765,7 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
         agent.emitter.on('show-window', async (url: string) => {
           // Use the test file name as the webview title
           const testFileName = 'TestDriver Session';
-          await openTestDriverWebview(url, `${testFileName} - TestDriver`);
+          await openTestDriverWebview(context, url, `${testFileName} - TestDriver`);
         });
 
         // Start the agent first
