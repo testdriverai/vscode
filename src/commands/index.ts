@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { logger, track } from '../utils/logger';
 import { registerRunTestCommand } from './runTest';
+import { registerChatCommand } from './chat';
 
 export const registerCommands = () => {
   vscode.commands.registerCommand('testdriver.walkthrough', () => {
@@ -21,4 +22,8 @@ export const registerCommands = () => {
 
 export const registerTestdriverRunTest = (context: vscode.ExtensionContext) => {
   registerRunTestCommand(context);
+};
+
+export const registerTestdriverChat = (context: vscode.ExtensionContext) => {
+  registerChatCommand(context);
 };

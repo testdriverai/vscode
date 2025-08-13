@@ -26,6 +26,10 @@
     "workspaceContains:testdriver/**",
     "onStartupFinished"
   ],
+  "extensionDependencies": [
+    "kisstkondoros.vscode-gutter-preview",
+    "redhat.vscode-yaml"
+  ],
   "contributes": {
     "yamlValidation": [
       {
@@ -44,7 +48,8 @@
             "title": "Get a TestDriver API Key",
             "description": "Because TestDriver is powered by agentic users, a free account is required to access:\n\n - Dedicated Virtual Machines (VMs) for running agents\n- TestDriver AI + Vision models\n- Community support\n[Get API Key](https://app.testdriver.ai/)",
             "media": {
-              "image": "media/main.png"
+              "image": "media/main.png",
+              "altText": "TestDriver main interface"
             },
             "completionEvents": [
               "openLink:https://app.testdriver.ai"
@@ -55,26 +60,28 @@
             "title": "Set your API Key",
             "description": "Configure TestDriver with your API Key.\n[Set Your API Key](command:testdriver.setApiKey)",
             "media": {
-              "image": "media/main.png"
+              "image": "media/main.png",
+              "altText": "TestDriver API key setup"
             },
             "completionEvents": [
               "command:testdriver.setApiKey"
             ]
           },
           {
-            "id": "clone",
-            "title": "Try an example",
-            "description": "Get set up quickly by cloning ready made examples.\n[Add Examples to this Workspace](command:testdriver.cloneExample)",
+            "id": "chat",
+            "title": "Chat with TestDriver AI",
+            "description": "Start a chat with TestDriver to generate tests. Click the TestDriver icon in the activity bar to open the chat panel.\n[Open TestDriver Chat](command:testdriver.openChat)",
             "media": {
-              "image": "media/main.png"
+              "image": "media/main.png",
+              "altText": "TestDriver chat interface"
             },
             "completionEvents": [
-              "command:testdriver.cloneExample"
+              "command:testdriver.openChat"
             ]
           },
           {
             "id": "runTest",
-            "title": "Run an example!",
+            "title": "Run your tests!",
             "description": "Open the VS Code Test Explorer to see and run a test by clicking the play button.\n[Open Test Panel](command:testdriver.runTest)",
             "media": {
               "image": "media/run.png",
@@ -99,6 +106,39 @@
         ]
       }
     ],
+    "views": {
+      "testdriver-activity": [
+        {
+          "id": "testdriver-sidebar",
+          "name": "Chat",
+          "type": "webview",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "testdriver-activity",
+          "title": "TestDriver",
+          "icon": "media/icon.png"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "testdriver.openChat",
+          "when": "view == testExplorer",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "testdriver.openChat"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "testdriver.toggleAnalytics",
@@ -123,6 +163,11 @@
       {
         "command": "testdriver.cloneExample",
         "title": "TestDriver: Clone Example"
+      },
+      {
+        "command": "testdriver.openChat",
+        "title": "TestDriver: Open Chat",
+        "icon": "$(comment-discussion)"
       }
     ]
   },
@@ -138,9 +183,11 @@
   },
   "dependencies": {
     "analytics-node": "^6.2.0",
+    "ansi-to-html": "^0.7.2",
     "dotenv": "^16.4.5",
+    "prismjs": "^1.30.0",
     "strip-ansi": "^7.1.0",
-    "testdriverai": "^6.0.15",
+    "testdriverai": "^6.0.16-canary.781656a.0",
     "vscode-languageclient": "^9.0.0",
     "winston": "^3.17.0"
   },

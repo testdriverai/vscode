@@ -7,8 +7,9 @@ import * as os from 'os';
 
 import { init } from './utils/init';
 import { setupTests } from './tests';
+import { TestDriverSidebarProvider } from './utils/sidebarProvider';
 
-import { registerCommands, registerTestdriverRunTest } from './commands';
+import { registerCommands, registerTestdriverRunTest, registerTestdriverChat } from './commands';
 
 // We'll get the testdriverai version at runtime to avoid bundling issues
 
@@ -65,32 +66,17 @@ export async function activate(context: vscode.ExtensionContext) {
   track({ event: 'extension.activated' });
   registerCommands();
   registerTestdriverRunTest(context);
+  registerTestdriverChat(context);
+
+  // Register the sidebar provider
+  const sidebarProvider = new TestDriverSidebarProvider(context.extensionUri, context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(TestDriverSidebarProvider.viewType, sidebarProvider)
+  );
+
   // Only call setupTests(context) once to initialize the shared controller
   const controller = setupTests(context);
   context.subscriptions.push(controller);
-
-  vscode.workspace.onDidOpenTextDocument((doc) => {
-    const isYaml = doc.languageId === 'yaml' || doc.fileName.endsWith('.yaml');
-    const isTestDriverYaml = doc.uri.fsPath.includes(path.join('testdriver', ''));
-
-    if (isYaml && isTestDriverYaml) {
-      const yamlExt = vscode.extensions.getExtension('redhat.vscode-yaml');
-
-      if (!yamlExt) {
-        vscode.window.showInformationMessage(
-          'TestDriver: Install "YAML by Red Hat" for schema validation and better editing in TestDriver YAML files.',
-          'Install'
-        ).then(selection => {
-          if (selection === 'Install') {
-            vscode.commands.executeCommand(
-              'workbench.extensions.installExtension',
-              'redhat.vscode-yaml'
-            );
-          }
-        });
-      }
-    }
-  });
 
   const consent = context.globalState.get<string>('testdriver.analyticsConsent');
 

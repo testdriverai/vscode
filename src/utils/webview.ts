@@ -1,11 +1,21 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { ensureVerticalLayout } from './layout';
 
-export function openTestDriverWebview(url: string, title = 'TestDriver') {
+export async function openTestDriverWebview(context: vscode.ExtensionContext, url: string, title = 'TestDriver') {
+  // Hide terminal if it's open
+  await vscode.commands.executeCommand('workbench.action.terminal.toggleTerminal').then(() => {
+    // Check if terminal is visible and hide it
+    vscode.commands.executeCommand('workbench.action.closePanel');
+  });
+
+  // Ensure we have a vertical layout where webview will be on top
+  await ensureVerticalLayout();
+
   const panel = vscode.window.createWebviewPanel(
     'testdriverWebview',
     title,
-    vscode.ViewColumn.Active,
+    vscode.ViewColumn.One, // Open in first column (top)
     {
       enableScripts: true,
       retainContextWhenHidden: true,
@@ -13,12 +23,12 @@ export function openTestDriverWebview(url: string, title = 'TestDriver') {
     }
   );
 
-const iconPath = vscode.Uri.file(path.join(__dirname, '..', '..', 'media', 'icon.png'));
+  panel.iconPath = vscode.Uri.file(path.join(
+                context.extensionPath,
+                'media',
+                'icon.png'
+            ));
 
-panel.iconPath = {
-  light: iconPath,
-  dark: iconPath
-};
 
 
   // Simple HTML to embed the external URL in an iframe
