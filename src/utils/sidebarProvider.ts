@@ -493,6 +493,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .message-content {
+            font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
             background-color: transparent; /* Remove background */
             border: none; /* Remove border */
             border-radius: 6px;
@@ -501,7 +502,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             overflow-wrap: break-word; /* Better word breaking */
             line-height: 1.4;
             min-width: 0; /* Allow content to shrink */
-            padding: 6px;
           }
 
           .message.status .message-content {
