@@ -3,6 +3,13 @@ import * as path from 'path';
 import { openTestDriverWebview } from '../utils/webview';
 import { openInBottomGroup } from '../utils/layout';
 import { track, logger } from '../utils/logger';
+import {
+  initializeDecorations,
+  disposeDecorations,
+  addCommandStatus,
+  clearCommandStatuses,
+  registerDecorationUpdates
+} from '../utils/decorations';
 
 // Import dotenv to load environment variables
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -292,6 +299,15 @@ interface EventData {
 }
 
 export function registerChatCommand(context: vscode.ExtensionContext) {
+  // Initialize decorations for chat command
+  initializeDecorations(context);
+  registerDecorationUpdates();
+
+  // Dispose decorations when extension is deactivated
+  context.subscriptions.push({
+    dispose: disposeDecorations
+  });
+
   const disposable = vscode.commands.registerCommand('testdriver.openChat', async () => {
     track({ event: 'chat.opened' });
 
@@ -770,7 +786,7 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
           });
         });
 
-              // Handle step:start events to open and highlight files
+        // Handle step:start events to open and highlight files
         agent.emitter.on('step:start', async (data: EventData) => {
           console.log('Step started - full data:', JSON.stringify(data, null, 2));
 
@@ -781,12 +797,57 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
             if (step) {
               console.log('Opening file for step:', sourcePos.filePath, 'line:', step.startLine);
               await openAndHighlightFile(sourcePos.filePath, step.startLine, step.startColumn);
+
+              // Add gutter decoration for running step
+              const fileUri = vscode.Uri.file(sourcePos.filePath);
+              addCommandStatus(fileUri.toString(), {
+                line: step.startLine,
+                column: step.startColumn,
+                status: 'running',
+                message: 'Step running...'
+              });
             } else {
               console.log('Opening file for step (fallback):', sourcePos.filePath);
               await openAndHighlightFile(sourcePos.filePath);
             }
           } else {
             console.log('No source position found in step data');
+          }
+        });
+
+        // Handle step:success events to update gutter decorations
+        agent.emitter.on('step:success', async (data: EventData) => {
+          if (data.sourcePosition && data.sourcePosition.filePath) {
+            const sourcePos = data.sourcePosition;
+            const step = sourcePos.step;
+
+            if (step) {
+              const fileUri = vscode.Uri.file(sourcePos.filePath);
+              addCommandStatus(fileUri.toString(), {
+                line: step.startLine,
+                column: step.startColumn,
+                status: 'success',
+                message: 'Step completed successfully'
+              });
+            }
+          }
+        });
+
+        // Handle step:failed events to update gutter decorations
+        agent.emitter.on('step:failed', async (data: EventData) => {
+          if (data.sourcePosition && data.sourcePosition.filePath) {
+            const sourcePos = data.sourcePosition;
+            const step = sourcePos.step;
+
+            if (step) {
+              const fileUri = vscode.Uri.file(sourcePos.filePath);
+              addCommandStatus(fileUri.toString(), {
+                line: step.startLine,
+                column: step.startColumn,
+                status: 'failure',
+                message: `Step failed: ${JSON.stringify(data)}`
+              });
+            }
           }
         });
 
@@ -801,12 +862,112 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
             if (command) {
               console.log('Opening file for command:', sourcePos.filePath, 'line:', command.startLine);
               await openAndHighlightFile(sourcePos.filePath, command.startLine, command.startColumn);
+
+              // Add gutter decoration for running command
+              const fileUri = vscode.Uri.file(sourcePos.filePath);
+              clearCommandStatuses(fileUri.toString()); // Clear previous statuses for this file
+              addCommandStatus(fileUri.toString(), {
+                line: command.startLine,
+                column: command.startColumn,
+                status: 'running',
+                message: 'Command running...'
+              });
             } else {
               console.log('Opening file for command (fallback):', sourcePos.filePath);
               await openAndHighlightFile(sourcePos.filePath);
             }
           } else {
             console.log('No source position found in command data');
+          }
+        });
+
+        // Handle command:success events to update gutter decorations
+        agent.emitter.on('command:success', async (data: EventData) => {
+          if (data.sourcePosition && data.sourcePosition.filePath) {
+            const sourcePos = data.sourcePosition;
+            const command = sourcePos.command;
+
+            if (command) {
+              const fileUri = vscode.Uri.file(sourcePos.filePath);
+              addCommandStatus(fileUri.toString(), {
+                line: command.startLine,
+                column: command.startColumn,
+                status: 'success',
+                message: 'Command completed successfully'
+              });
+            }
+          }
+        });
+
+        // Handle command:progress events which might indicate success
+        agent.emitter.on('command:progress', async (data: EventData) => {
+          if (data.sourcePosition && data.sourcePosition.filePath) {
+            const sourcePos = data.sourcePosition;
+            const command = sourcePos.command;
+
+            if (command) {
+              // Check if the progress data indicates completion/success
+              const progressData = data as { status?: string };
+              if (progressData && progressData.status === 'completed') {
+                const fileUri = vscode.Uri.file(sourcePos.filePath);
+                addCommandStatus(fileUri.toString(), {
+                  line: command.startLine,
+                  column: command.startColumn,
+                  status: 'success',
+                  message: 'Command completed successfully'
+                });
+              }
+            }
+          }
+        });
+
+        // Handle command:failed events to update gutter decorations
+        agent.emitter.on('command:failed', async (data: EventData) => {
+          if (data.sourcePosition && data.sourcePosition.filePath) {
+            const sourcePos = data.sourcePosition;
+            const command = sourcePos.command;
+
+            if (command) {
+              const fileUri = vscode.Uri.file(sourcePos.filePath);
+              addCommandStatus(fileUri.toString(), {
+                line: command.startLine,
+                column: command.startColumn,
+                status: 'failure',
+                message: `Command failed: ${JSON.stringify(data)}`
+              });
+            }
+          }
+        });
+
+        // Handle general error events to update gutter decorations
+        agent.emitter.on('error:*', async (errorMessage: string) => {
+          if (typeof errorMessage === 'object') {
+            errorMessage = JSON.stringify(errorMessage, null, 2);
+          }
+
+          // Update decorations to show command failure
+          if (agent.sourceMapper && typeof agent.sourceMapper.getCurrentSourcePosition === 'function') {
+            const pos = agent.sourceMapper.getCurrentSourcePosition();
+            if (pos && pos.filePath) {
+              const diagFile = vscode.Uri.file(pos.filePath);
+
+              // Try command position first, then step position
+              if (pos.command && diagFile) {
+                addCommandStatus(diagFile.toString(), {
+                  line: pos.command.startLine,
+                  column: pos.command.startColumn,
+                  status: 'failure',
+                  message: errorMessage
+                });
+              } else if (pos.step && diagFile) {
+                addCommandStatus(diagFile.toString(), {
+                  line: pos.step.startLine,
+                  column: pos.step.startColumn,
+                  status: 'failure',
+                  message: errorMessage
+                });
+              }
+            }
           }
         });
 
