@@ -541,7 +541,7 @@ const setupRunProfiles = (controller: vscode.TestController, context?: vscode.Ex
                 // Use the test file name as the webview title
                 const testFileName = test.label || 'TestDriver';
 
-                await openTestDriverWebview(context!, url, `${testFileName} - TestDriver`);
+                await openTestDriverWebview(context!, url, `${testFileName}`);
 
             });
 
