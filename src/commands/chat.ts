@@ -141,6 +141,32 @@ function processEventData(args: unknown[], converter: typeof AnsiToHtml): unknow
 }
 
 /**
+ * Process event data for error events - don't convert ANSI to HTML for errors
+ */
+function processErrorEventData(args: unknown[]): unknown[] {
+  return args.map(arg => {
+    if (typeof arg === 'string') {
+      // For errors, just strip ANSI codes instead of converting to HTML
+      // eslint-disable-next-line no-control-regex
+      return arg.replace(/\x1b\[[0-9;]*m/g, '');
+    } else if (typeof arg === 'object' && arg !== null) {
+      // Recursively process object properties
+      const processed: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(arg)) {
+        if (typeof value === 'string') {
+          // eslint-disable-next-line no-control-regex
+          processed[key] = value.replace(/\x1b\[[0-9;]*m/g, '');
+        } else {
+          processed[key] = value;
+        }
+      }
+      return processed;
+    }
+    return arg;
+  });
+}
+
+/**
  * Open a file and highlight a specific line/column
  */
 async function openAndHighlightFile(filePath: string, lineNumber?: number, columnNumber?: number): Promise<void> {
@@ -157,38 +183,68 @@ async function openAndHighlightFile(filePath: string, lineNumber?: number, colum
       return;
     }
 
-    // Open the file in the bottom panel (below VM window)
-    const document = await openInBottomGroup(fileUri, {
-      preview: false,
-      preserveFocus: false
-    });
+    // Check if the file is already open in any editor group
+    const existingEditors = vscode.window.visibleTextEditors;
+    let targetEditor: vscode.TextEditor | undefined;
 
-    if (!document) {
-      console.error('Could not open document in bottom group');
-      return;
+    for (const editor of existingEditors) {
+      if (editor.document.uri.fsPath === filePath) {
+        // File is already open, check if it's in the bottom group (ViewColumn.Two)
+        if (editor.viewColumn === vscode.ViewColumn.Two) {
+          targetEditor = editor;
+          console.log(`File already open in bottom group: ${filePath}`);
+          break;
+        }
+      }
     }
 
-    console.log(`Successfully opened file: ${filePath}`);
+    // If not already open in bottom group, open it there
+    if (!targetEditor) {
+      const document = await openInBottomGroup(fileUri, {
+        preview: false,
+        preserveFocus: false
+      });
+
+      if (!document) {
+        console.error('Could not open document in bottom group');
+        return;
+      }
+
+      targetEditor = document;
+      console.log(`Successfully opened file in bottom group: ${filePath}`);
+    }
+
+    // Focus on the target editor to ensure it's active
+    await vscode.window.showTextDocument(targetEditor.document, {
+      viewColumn: targetEditor.viewColumn,
+      preserveFocus: false,
+      preview: false
+    });
 
     // Highlight the specific line if provided
-    if (lineNumber !== undefined && lineNumber > 0) {
+    if (lineNumber !== undefined && lineNumber > 0 && targetEditor) {
       const line = Math.max(0, lineNumber - 1); // Convert to 0-based indexing
       const column = Math.max(0, (columnNumber || 1) - 1); // Convert to 0-based indexing
 
       console.log(`Highlighting line ${line + 1}, column ${column + 1} (0-based: ${line}, ${column})`);
 
-      // Create a range that spans the entire line for better visibility
-      const lineText = document.document.lineAt(line);
-      const range = new vscode.Range(
-        new vscode.Position(line, 0),
-        new vscode.Position(line, lineText.text.length)
-      );
+      // Ensure the line number is valid for the document
+      if (line < targetEditor.document.lineCount) {
+        // Create a range that spans the entire line for better visibility
+        const lineText = targetEditor.document.lineAt(line);
+        const range = new vscode.Range(
+          new vscode.Position(line, 0),
+          new vscode.Position(line, lineText.text.length)
+        );
 
-      // Set selection and reveal the range
-      document.selection = new vscode.Selection(range.start, range.end);
-      document.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+        // Set selection and reveal the range
+        targetEditor.selection = new vscode.Selection(range.start, range.end);
+        targetEditor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 
-      console.log(`Highlighted range: line ${range.start.line + 1} to ${range.end.line + 1}`);
+        console.log(`Highlighted range: line ${range.start.line + 1} to ${range.end.line + 1}`);
+      } else {
+        console.warn(`Line number ${lineNumber} exceeds document length (${targetEditor.document.lineCount} lines)`);
+      }
     } else {
       console.log('No line number provided for highlighting');
     }
@@ -519,10 +575,31 @@ async function copyExampleToWorkspace(exampleName: string, workspaceFolder: vsco
 }
 
 // Function to stop the current test execution
-async function stopTestExecution(): Promise<void> {
+async function stopTestExecution(panel?: vscode.WebviewPanel | vscode.WebviewView): Promise<void> {
   if (globalAgent) {
     try {
       console.log('Stopping TestDriver agent...');
+
+      // First, set the stopped flag to immediately halt execution
+      if (typeof globalAgent.stop === 'function') {
+        globalAgent.stop();
+      } else {
+        // Fallback for older agent versions - set stopped flag directly
+        globalAgent.stopped = true;
+      }
+
+      // Send message to webview to stop any spinners immediately
+      if (panel) {
+        const webview = 'webview' in panel ? panel.webview : panel;
+        webview.postMessage({
+          command: 'agentEvent',
+          eventName: 'exit',
+          data: [null],
+          timestamp: Date.now()
+        });
+      }
+
+      // Then call exit to clean up
       await globalAgent.exit();
       globalAgent = null;
       console.log('TestDriver agent stopped and removed from memory');
@@ -674,8 +751,15 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
         agent.emitter.onAny((eventName: string, ...args: any[]) => {
           console.log('Received agent event:', eventName, args);
 
-          // Process ANSI codes in the event data
-          const processedArgs = processEventData(args, ansiConverter);
+          // Process event data differently for error events vs regular events
+          let processedArgs: unknown[];
+          if (eventName.startsWith('error:')) {
+            // For error events, strip ANSI codes but don't convert to HTML
+            processedArgs = processErrorEventData(args);
+          } else {
+            // For regular events, convert ANSI codes to HTML
+            processedArgs = processEventData(args, ansiConverter);
+          }
 
           const webview = 'webview' in panel ? panel.webview : panel;
           webview.postMessage({
@@ -736,16 +820,23 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
           // Restore original working directory
           process.chdir(originalCwd);
 
+          // Send exit event to webview to stop any running spinners
+          const webview = 'webview' in panel ? panel.webview : panel;
+          webview.postMessage({
+            command: 'agentEvent',
+            eventName: 'exit',
+            data: [code],
+            timestamp: Date.now()
+          });
+
           if (!chatEnded) {
             chatEnded = true;
-            const webview = 'webview' in panel ? panel.webview : panel;
             webview.postMessage({
               command: 'chatResponse'
             });
           }
 
           if (code !== 0) {
-            const webview = 'webview' in panel ? panel.webview : panel;
             webview.postMessage({
               command: 'error',
               data: `Chat session ended with exit code ${code}`
@@ -775,6 +866,28 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
         // Build the environment (sandbox) for interactive mode
         console.log('Building environment...');
         await agent.buildEnv({ });
+
+        // Load existing file content into executionHistory to append new commands instead of overwriting
+        // This mimics what the readline interface does in its start() method
+        // We do this AFTER agent.start() and buildEnv() to ensure the agent is fully initialized
+        if (fs.existsSync(agent.thisFile)) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const generator = require('testdriverai/agent/lib/generator.js');
+            const object = await generator.hydrateFromYML(
+              fs.readFileSync(agent.thisFile, 'utf-8'),
+            );
+
+            // Push each step to executionHistory from { commands: {steps: [ { commands: [Array] } ] } }
+            object.steps?.forEach((step: unknown) => {
+              agent.executionHistory.push(step);
+            });
+
+            console.log(`Loaded existing test script ${agent.thisFile} with ${object.steps?.length || 0} steps`);
+          } catch (error) {
+            console.warn('Error loading existing test script:', error);
+          }
+        }
 
         // Open the test file being edited (relative to workspace)
         const testFilePath = path.join(workingDir, 'testdriver', 'testdriver.yaml');

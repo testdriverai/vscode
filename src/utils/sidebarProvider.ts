@@ -91,7 +91,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
   private async _handleStopTest(webviewView: vscode.WebviewView) {
     try {
       console.log('Stopping TestDriver test execution...');
-      await stopTestExecution();
+      await stopTestExecution(webviewView);
 
       // Send message to webview to reset the UI state
       webviewView.webview.postMessage({
@@ -454,7 +454,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             display: flex;
             align-items: flex-start;
             gap: 8px;
-            font-size: 12px;
+            font-size: 13px;
           }
 
           .message.user {
@@ -522,7 +522,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
             padding: 8px;
             font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
-            font-size: 11px;
             color: var(--vscode-errorForeground, #f14c4c);
             white-space: pre-wrap;
             word-break: break-word;
@@ -550,7 +549,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
             padding: 8px; /* Slightly more padding since no message background */
             margin: 4px 0;
-            font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
+            font-family: var(--vscode-editor-font-family), "Droid Sans Mono", Menlo, Monaco, "Courier New", monospace;
             font-size: 10px;
             overflow-x: auto;
             overflow-y: hidden;

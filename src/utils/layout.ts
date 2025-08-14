@@ -52,8 +52,13 @@ export async function openInTopGroup(document: vscode.TextDocument | vscode.Uri,
  */
 export async function openInBottomGroup(document: vscode.TextDocument | vscode.Uri, options?: vscode.TextDocumentShowOptions): Promise<vscode.TextEditor | undefined> {
   try {
-    // Ensure we have vertical layout first
-    await ensureVerticalLayout();
+    // Check if we already have the correct layout (at least 2 editor groups)
+    const editorGroups = vscode.window.tabGroups.all;
+
+    // If we don't have at least 2 groups, ensure vertical layout
+    if (editorGroups.length < 2) {
+      await ensureVerticalLayout();
+    }
 
     // Focus on the second editor group (bottom in vertical layout)
     await vscode.commands.executeCommand('workbench.action.focusSecondEditorGroup');

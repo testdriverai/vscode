@@ -251,6 +251,10 @@ class TestDriverWebview {
 
   stopTest() {
     console.log('Stopping test execution...');
+
+    // Stop any loading spinners immediately
+    this.completeLoadingSpinner();
+
     this.addMessage('🛑 Stopping test execution...', 'status', '🛑');
 
     this.vscode.postMessage({
@@ -454,6 +458,12 @@ class TestDriverWebview {
       case 'error:sdk':
       case 'error:sandbox':
         this.addMessage(String(mainData), 'error', '❌');
+        break;
+
+      case 'exit':
+        // Agent has exited - complete any loading spinner and reset state
+        this.completeLoadingSpinner();
+        console.log('Agent exited with code:', mainData);
         break;
 
       default:
