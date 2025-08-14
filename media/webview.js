@@ -63,6 +63,22 @@ class TestDriverWebview {
       this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 80) + 'px';
     });
 
+    // File selector button
+    const selectFileButton = document.getElementById('selectFileButton');
+    if (selectFileButton) {
+      selectFileButton.addEventListener('click', () => {
+        this.selectFile();
+      });
+    }
+
+    // File path click handler to open file
+    const currentFileElement = document.getElementById('currentFile');
+    if (currentFileElement) {
+      currentFileElement.addEventListener('click', () => {
+        this.openCurrentFile();
+      });
+    }
+
     // Handle messages from the extension
     window.addEventListener('message', (event) => {
       const message = event.data;
@@ -119,6 +135,9 @@ class TestDriverWebview {
           break;
         case 'updateFileIndicator':
           this.updateFileIndicator(message.workspaceName, message.fileName);
+          break;
+        case 'clearChat':
+          this.clearChat();
           break;
         case 'showRunButton':
           this.showRunButton();
@@ -573,13 +592,12 @@ class TestDriverWebview {
 
   updateFileIndicator(workspaceName, fileName) {
     const fileIndicator = document.getElementById('fileIndicator');
-    const workspaceNameElement = document.getElementById('workspaceName');
     const currentFileElement = document.getElementById('currentFile');
 
-    if (fileIndicator && workspaceNameElement && currentFileElement) {
-      workspaceNameElement.textContent = workspaceName;
+    if (fileIndicator && currentFileElement) {
       currentFileElement.textContent = fileName;
-      fileIndicator.classList.add('visible');
+      // File indicator should always be visible now
+      fileIndicator.style.display = 'block';
     }
   }
 
@@ -674,6 +692,46 @@ class TestDriverWebview {
         }
       }, 1000);
     }
+  }
+
+  selectFile() {
+    this.vscode.postMessage({
+      command: 'selectFile'
+    });
+  }
+
+  openCurrentFile() {
+    this.vscode.postMessage({
+      command: 'openCurrentFile'
+    });
+  }
+
+  clearChat() {
+    // Clear all messages except the empty state
+    this.messagesContainer.innerHTML = '';
+
+    // Restore empty state
+    this.messagesContainer.appendChild(this.emptyState);
+    this.emptyState.style.display = 'flex';
+
+    // Reset running state
+    this.isRunning = false;
+    this.sendButton.disabled = false;
+    this.sendButton.textContent = 'Generate Test Steps';
+
+    if (this.runButton) {
+      this.runButton.disabled = false;
+      this.runButton.textContent = 'Run';
+    }
+    if (this.runButtonTop) {
+      this.runButtonTop.disabled = false;
+      this.runButtonTop.textContent = 'Run';
+    }
+
+    // Clear streaming messages
+    this.streamingMessages.clear();
+
+    this.focusInput();
   }
 }
 

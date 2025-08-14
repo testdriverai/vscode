@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { showTestDriverExamples, handleChatMessage, stopTestExecution } from '../commands/chat';
 import { openInBottomGroup } from './layout';
 
@@ -6,6 +7,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'testdriver-sidebar';
 
   private _view?: vscode.WebviewView;
+  private _selectedFilePath = 'testdriver/testdriver.yaml';
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -39,7 +41,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           break;
         }
         case 'sendMessage': {
-          await handleChatMessage(message.message, webviewView, this._context);
+          await handleChatMessage(message.message, webviewView, this._context, this._selectedFilePath);
           break;
         }
         case 'runTests': {
@@ -48,6 +50,14 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
         }
         case 'stopTest': {
           await this._handleStopTest(webviewView);
+          break;
+        }
+        case 'selectFile': {
+          await this._handleSelectFile(webviewView);
+          break;
+        }
+        case 'openCurrentFile': {
+          await this._handleOpenCurrentFile();
           break;
         }
       }
@@ -71,6 +81,10 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
     if (this._view) {
       this._view.webview.postMessage(message);
     }
+  }
+
+  public getSelectedFilePath(): string {
+    return this._selectedFilePath;
   }
 
   private _updateFileIndicator(workspaceName: string, fileName: string) {
@@ -101,6 +115,126 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       console.error('Error stopping test:', error);
       vscode.window.showErrorMessage('Failed to stop TestDriver test: ' + (error as Error).message);
+    }
+  }
+
+  private async _handleSelectFile(webviewView: vscode.WebviewView) {
+    try {
+      console.log('Opening file selector...');
+
+      // Get the current workspace folder
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return;
+      }
+
+      const workspaceFolder = workspaceFolders[0];
+
+      // Look for YAML files in the testdriver folder and workspace root
+      const yamlFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(workspaceFolder, '**/*.{yml,yaml}'),
+        new vscode.RelativePattern(workspaceFolder, 'node_modules/**'),
+        50
+      );
+
+      if (yamlFiles.length === 0) {
+        vscode.window.showErrorMessage('No YAML files found in the workspace');
+        return;
+      }
+
+      // Convert file URIs to relative paths for display
+      const fileOptions = yamlFiles.map(fileUri => {
+        const relativePath = vscode.workspace.asRelativePath(fileUri);
+        return {
+          label: relativePath,
+          description: relativePath.includes('testdriver/') ? 'TestDriver file' : 'YAML file',
+          uri: fileUri
+        };
+      });
+
+      // Sort to prioritize testdriver files
+      fileOptions.sort((a, b) => {
+        if (a.label.includes('testdriver/') && !b.label.includes('testdriver/')) {
+          return -1;
+        }
+        if (!a.label.includes('testdriver/') && b.label.includes('testdriver/')) {
+          return 1;
+        }
+        return a.label.localeCompare(b.label);
+      });
+
+      // Show quick pick
+      const selectedFile = await vscode.window.showQuickPick(fileOptions, {
+        placeHolder: 'Select a YAML file for TestDriver chat',
+        matchOnDescription: true
+      });
+
+      if (!selectedFile) {
+        return; // User cancelled
+      }
+
+      const relativePath = selectedFile.label;
+      console.log('Selected file:', relativePath);
+
+      // Clear the chat and start fresh with the new file
+      webviewView.webview.postMessage({
+        command: 'clearChat'
+      });
+
+      // Update the file indicator
+      webviewView.webview.postMessage({
+        command: 'updateFileIndicator',
+        workspaceName: workspaceFolder.name,
+        fileName: relativePath
+      });
+
+      // Store the selected file path for use in chat messages
+      this._selectedFilePath = relativePath;
+
+      vscode.window.showInformationMessage(`Started new chat with file: ${relativePath}`);
+
+    } catch (error) {
+      console.error('Error selecting file:', error);
+      vscode.window.showErrorMessage('Failed to select file: ' + (error as Error).message);
+    }
+  }
+
+  private async _handleOpenCurrentFile() {
+    try {
+      console.log('Opening current file:', this._selectedFilePath);
+
+      // Get the current workspace folder
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return;
+      }
+
+      const workspaceFolder = workspaceFolders[0];
+      const filePath = path.join(workspaceFolder.uri.fsPath, this._selectedFilePath);
+      const fileUri = vscode.Uri.file(filePath);
+
+      // Check if file exists
+      try {
+        await vscode.workspace.fs.stat(fileUri);
+      } catch {
+        vscode.window.showErrorMessage(`File not found: ${this._selectedFilePath}`);
+        return;
+      }
+
+      // Open the file in the editor
+      const document = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(document, {
+        preview: false,
+        viewColumn: vscode.ViewColumn.One
+      });
+
+      console.log(`Successfully opened file: ${this._selectedFilePath}`);
+
+    } catch (error) {
+      console.error('Error opening current file:', error);
+      vscode.window.showErrorMessage('Failed to open file: ' + (error as Error).message);
     }
   }
 
@@ -397,21 +531,35 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-sideBar-background);
             border-top: 1px solid var(--vscode-sideBar-border);
             flex-shrink: 0;
-            display: none; /* Hidden by default */
+            display: block; /* Always visible */
             border-left: 3px solid var(--vscode-testing-runAction);
             font-size: 11px;
-          }
-
-          .file-indicator.visible {
-            display: block;
           }
 
           .file-info {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 6px;
             font-size: 12px;
             color: var(--vscode-descriptionForeground);
+          }
+
+          .select-file-button {
+            background: none;
+            border: none;
+            color: var(--vscode-textLink-foreground);
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-size: 12px;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+          }
+
+          .select-file-button:hover {
+            opacity: 1;
+            background-color: var(--vscode-button-secondaryHoverBackground);
           }
 
           .file-icon {
@@ -424,6 +572,17 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .file-path {
             color: var(--vscode-textLink-foreground);
             font-size: 12px;
+          }
+
+          .file-path.clickable {
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-color: transparent;
+            transition: text-decoration-color 0.2s ease;
+          }
+
+          .file-path.clickable:hover {
+            text-decoration-color: var(--vscode-textLink-foreground);
           }
 
           .workspace-name {
@@ -934,7 +1093,10 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
           <div class="file-indicator" id="fileIndicator">
             <div class="file-info">
-              <span class="file-path" id="currentFile">No file selected</span>
+              <span class="file-path clickable" id="currentFile" title="Click to open file">testdriver/testdriver.yaml</span>
+              <button id="selectFileButton" class="select-file-button" title="Select a different file">
+                <span class="codicon codicon-folder-opened"></span>
+              </button>
             </div>
           </div>
 

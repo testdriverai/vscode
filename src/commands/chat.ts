@@ -633,8 +633,9 @@ export { handleChatMessage, showTestDriverExamples, stopTestExecution };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let globalAgent: any = null;
+let currentFilePath = 'testdriver/testdriver.yaml';
 
-async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel | vscode.WebviewView, context: vscode.ExtensionContext) {
+async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel | vscode.WebviewView, context: vscode.ExtensionContext, selectedFilePath?: string) {
   try {
     track({ event: 'chat.message.sent', properties: { messageLength: userMessage.length } });
 
@@ -729,9 +730,18 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
 
       // Set up CLI args for the agent in "edit" mode (interactive mode)
       // This is like running: npx testdriverai@latest edit (which enters interactive mode)
+      const targetFilePath = selectedFilePath || 'testdriver/testdriver.yaml';
+
+      // If the file path has changed, reset the agent to start a new session
+      if (targetFilePath !== currentFilePath) {
+        console.log(`File path changed from ${currentFilePath} to ${targetFilePath}, resetting agent`);
+        globalAgent = null;
+        currentFilePath = targetFilePath;
+      }
+
       const cliArgs = {
         command: 'edit',
-        args: ['testdriver/testdriver.yaml'], // Use relative path from workspace root
+        args: [targetFilePath], // Use the selected file path
         options: {
           // new: true
         },
@@ -860,7 +870,16 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
             const command = sourcePos.command;
 
             if (command) {
-              console.log('Opening file for command:', sourcePos.filePath, 'line:', command.startLine);
+                console.log(`[Command:start] Opening file for command: ${sourcePos.filePath}`);
+                console.log(`[Command:start] Command details:`, {
+                commandIndex: command.commandIndex,
+                command: command.command,
+                startLine: command.startLine,
+                startColumn: command.startColumn,
+                endLine: command.endLine,
+                endColumn: command.endColumn
+                });
+                console.log(`[Command:start] SourcePosition:`, sourcePos);
               await openAndHighlightFile(sourcePos.filePath, command.startLine, command.startColumn);
 
               // Add gutter decoration for running command
@@ -936,6 +955,42 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
                 message: `Command failed: ${JSON.stringify(data)}`
               });
             }
+          }
+        });
+
+        // Handle file:save events to scroll to the end of the saved file
+        agent.emitter.on('file:save', async (data: EventData) => {
+          console.log('File save event received:', JSON.stringify(data, null, 2));
+
+          if (data.sourcePosition && data.sourcePosition.filePath) {
+            const filePath = data.sourcePosition.filePath;
+            console.log('Scrolling to end of saved file:', filePath);
+
+            try {
+              // Open the file
+              const document = await vscode.workspace.openTextDocument(filePath);
+
+              // Show the document in the editor
+              const editor = await vscode.window.showTextDocument(document, {
+                viewColumn: vscode.ViewColumn.Active,
+                preserveFocus: false
+              });
+
+              // Scroll to the end of the document
+              const lastLine = document.lineCount - 1;
+              const lastLineLength = document.lineAt(lastLine).text.length;
+              const endPosition = new vscode.Position(lastLine, lastLineLength);
+
+              // Set cursor at the end and reveal it
+              editor.selection = new vscode.Selection(endPosition, endPosition);
+              editor.revealRange(new vscode.Range(endPosition, endPosition), vscode.TextEditorRevealType.InCenter);
+
+              console.log(`Scrolled to end of file: line ${lastLine + 1}, column ${lastLineLength + 1}`);
+            } catch (error) {
+              console.error('Failed to scroll to end of saved file:', error);
+            }
+          } else {
+            console.log('No file path found in file:save event data');
           }
         });
 
