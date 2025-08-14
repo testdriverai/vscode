@@ -7,8 +7,9 @@ import * as os from 'os';
 
 import { init } from './utils/init';
 import { setupTests } from './tests';
+import { TestDriverSidebarProvider } from './utils/sidebarProvider';
 
-import { registerCommands, registerTestdriverRunTest } from './commands';
+import { registerCommands, registerTestdriverRunTest, registerTestdriverChat } from './commands';
 
 // We'll get the testdriverai version at runtime to avoid bundling issues
 
@@ -65,6 +66,14 @@ export async function activate(context: vscode.ExtensionContext) {
   track({ event: 'extension.activated' });
   registerCommands();
   registerTestdriverRunTest(context);
+  registerTestdriverChat(context);
+
+  // Register the sidebar provider
+  const sidebarProvider = new TestDriverSidebarProvider(context.extensionUri, context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(TestDriverSidebarProvider.viewType, sidebarProvider)
+  );
+
   // Only call setupTests(context) once to initialize the shared controller
   const controller = setupTests(context);
   context.subscriptions.push(controller);
