@@ -613,7 +613,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             display: flex;
             align-items: flex-start;
             gap: 8px;
-            font-size: 13px;
+            font-size: 12px;
           }
 
           .message.user {
@@ -652,7 +652,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .message-content {
-            font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
+            font-family: var(--vscode-editor-font-family), Consolas,Monaco,'Andale Mono','Ubuntu Mono',monospace;
             background-color: transparent; /* Remove background */
             border: none; /* Remove border */
             border-radius: 6px;
@@ -680,7 +680,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border-left: 3px solid var(--vscode-errorForeground, #f14c4c);
             border-radius: 3px;
             padding: 8px;
-            font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
+            font-family: var(--vscode-editor-font-family), Consolas,Monaco,'Andale Mono','Ubuntu Mono',monospace;
             color: var(--vscode-errorForeground, #f14c4c);
             white-space: pre-wrap;
             word-break: break-word;
@@ -703,23 +703,19 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .code-block {
-            background-color: var(--vscode-textCodeBlock-background);
-            border: 1px solid var(--vscode-textBlockQuote-border);
+            background-color: var(--vscode-textCodeBlock-background) !important;
+            border: 1px solid var(--vscode-textBlockQuote-border) !important;
+            box-shadow: none;
             border-radius: 3px;
             padding: 8px; /* Slightly more padding since no message background */
             margin: 4px 0;
-            font-family: var(--vscode-editor-font-family), "Droid Sans Mono", Menlo, Monaco, "Courier New", monospace;
-            font-size: 10px;
+            font-family: var(--vscode-editor-font-family), Consolas,Monaco,'Andale Mono','Ubuntu Mono',monospace;
+            font-size: 12px;
             overflow-x: auto;
             overflow-y: hidden;
             white-space: pre;
             max-width: 100%;
             word-wrap: normal; /* Don't break words in code */
-          }
-
-          .code-block.yaml {
-            border-left: 3px solid var(--vscode-textLink-foreground);
-            background-color: var(--vscode-textBlockQuote-background);
           }
 
           .code-block code {
@@ -733,71 +729,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             overflow-wrap: normal;
           }
 
-          /* Prism.js VS Code theme integration */
-          .code-block pre[class*="language-"] {
-            background: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            border: none !important;
-            border-radius: 0 !important;
-          }
-
-          .code-block code[class*="language-"] {
-            background: none !important;
-            color: var(--vscode-editor-foreground) !important;
-          }
-
-          /* Override Prism.js tokens to use VS Code colors */
-          .token.comment,
-          .token.prolog,
-          .token.doctype,
-          .token.cdata {
-            color: var(--vscode-editor-comment-foreground, #6A9955) !important;
-          }
-
-          .token.property,
-          .token.tag,
-          .token.boolean,
-          .token.number,
-          .token.constant,
-          .token.symbol,
-          .token.deleted {
-            color: var(--vscode-symbolIcon-numberForeground, #B5CEA8) !important;
-          }
-
-          .token.selector,
-          .token.attr-name,
-          .token.string,
-          .token.char,
-          .token.builtin,
-          .token.inserted {
-            color: var(--vscode-symbolIcon-stringForeground, #CE9178) !important;
-          }
-
-          .token.operator,
-          .token.entity,
-          .token.url,
-          .language-css .token.string,
-          .style .token.string {
-            color: var(--vscode-editor-foreground) !important;
-          }
-
-          .token.atrule,
-          .token.attr-value,
-          .token.keyword {
-            color: var(--vscode-symbolIcon-keywordForeground, #569CD6) !important;
-          }
-
-          .token.function,
-          .token.class-name {
-            color: var(--vscode-symbolIcon-functionForeground, #DCDCAA) !important;
-          }
-
-          .token.regex,
-          .token.important,
-          .token.variable {
-            color: var(--vscode-symbolIcon-variableForeground, #9CDCFE) !important;
-          }
 
           /* VS Code icon styling */
           .codicon {
@@ -820,7 +751,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border: 1px solid var(--vscode-textBlockQuote-border);
             border-radius: 2px;
             padding: 1px 3px;
-            font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
+            font-family: var(--vscode-editor-font-family), Consolas,Monaco,'Andale Mono','Ubuntu Mono',monospace;
             font-size: 10px;
             color: var(--vscode-textPreformat-foreground);
           }
