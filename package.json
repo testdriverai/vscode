@@ -187,7 +187,7 @@
     "dotenv": "^16.4.5",
     "prismjs": "^1.30.0",
     "strip-ansi": "^7.1.0",
-    "testdriverai": "../cli",
+    "testdriverai": "^6.0.19-canary.2597540.0",
     "vscode-languageclient": "^9.0.0",
     "winston": "^3.17.0"
   },

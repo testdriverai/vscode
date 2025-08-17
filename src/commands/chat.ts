@@ -796,6 +796,15 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
           });
         });
 
+        // Handle show-window event to open TestDriver webview instead of external browser
+        // This needs to be bound early, before agent.start() or buildEnv(), as the event might be emitted during initialization
+        agent.emitter.on('show-window', async (url: string) => {
+          console.log('show-window event received with URL:', url);
+          // Use the test file name as the webview title
+          const testFileName = 'TestDriver Session';
+          await openTestDriverWebview(context, url, `${testFileName} - TestDriver`);
+        });
+
         // Start the agent first
         console.log('Starting agent...');
         await agent.start();
@@ -1074,13 +1083,6 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
               event: 'chat.session.completed',
             });
           }
-        });
-
-        // Handle show-window event to open TestDriver webview instead of external browser
-        agent.emitter.on('show-window', async (url: string) => {
-          // Use the test file name as the webview title
-          const testFileName = 'TestDriver Session';
-          await openTestDriverWebview(context, url, `${testFileName} - TestDriver`);
         });
 
         // Load existing file content into executionHistory to append new commands instead of overwriting

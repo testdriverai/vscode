@@ -17,7 +17,7 @@ class TestDriverWebview {
   init() {
     this.setupEventListeners();
     this.focusInput();
-    
+
     // Wait for marked to be available before configuring
     this.waitForMarkedAndConfigure();
 
@@ -28,11 +28,11 @@ class TestDriverWebview {
   waitForMarkedAndConfigure() {
     let attempts = 0;
     const maxAttempts = 50; // 5 seconds max
-    
+
     const checkAndConfigure = () => {
       attempts++;
       console.log(`Attempt ${attempts}: Checking for marked...`);
-      
+
       if (typeof marked !== 'undefined') {
         console.log('Marked found, configuring...');
         this.configureMarked();
@@ -43,7 +43,7 @@ class TestDriverWebview {
         console.error('Marked failed to load after', maxAttempts, 'attempts');
       }
     };
-    
+
     checkAndConfigure();
   }
 
@@ -87,7 +87,7 @@ class TestDriverWebview {
         gfm: true,    // GitHub Flavored Markdown
         sanitize: false
       });
-      
+
       console.log('Marked configured successfully with custom renderer');
     } else {
       console.error('Cannot configure marked - library not available');
@@ -793,6 +793,34 @@ function selectExample(exampleName) {
     });
   }
 }
+
+// Global function to fill input from example prompts and send the message
+window.fillInput = function(text) {
+  console.log('fillInput called with:', text);
+  console.log('testDriverWebview available:', !!window.testDriverWebview);
+
+  if (window.testDriverWebview && window.testDriverWebview.chatInput) {
+    console.log('Setting input value and sending message');
+    window.testDriverWebview.chatInput.value = text;
+    window.testDriverWebview.chatInput.focus();
+    // Auto-resize the textarea
+    window.testDriverWebview.chatInput.style.height = 'auto';
+    window.testDriverWebview.chatInput.style.height = window.testDriverWebview.chatInput.scrollHeight + 'px';
+
+    // Automatically send the message
+    try {
+      window.testDriverWebview.sendMessage();
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  } else {
+    console.error('testDriverWebview or chatInput not available');
+    console.log('testDriverWebview:', window.testDriverWebview);
+    if (window.testDriverWebview) {
+      console.log('chatInput:', window.testDriverWebview.chatInput);
+    }
+  }
+};
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {

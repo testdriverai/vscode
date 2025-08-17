@@ -927,48 +927,60 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             height: 100%;
             text-align: center;
             color: var(--vscode-descriptionForeground);
-            padding: 16px;
+            padding: 24px 16px;
           }
 
           .empty-state .helmet-large {
-            width: 32px;
-            height: 32px;
-            margin-bottom: 12px;
-            opacity: 0.6;
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            opacity: 0.8;
           }
 
           .empty-state h3 {
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 600;
             margin-bottom: 8px;
+            color: var(--vscode-foreground);
           }
 
           .empty-state p {
-            font-size: 12px;
-            line-height: 1.4;
-            margin-bottom: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            max-width: 280px;
+            color: var(--vscode-descriptionForeground);
           }
 
           .example-prompts {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
             width: 100%;
+            max-width: 280px;
           }
 
           .example-prompt {
             background-color: var(--vscode-button-secondaryBackground);
             color: var(--vscode-button-secondaryForeground);
-            border: none;
-            border-radius: 3px;
-            padding: 4px 6px;
+            border: 1px solid var(--vscode-button-border, transparent);
+            border-radius: 6px;
+            padding: 8px 12px;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 12px;
             text-align: left;
             line-height: 1.3;
+            transition: all 0.15s ease;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
           }
 
           .example-prompt:hover {
             background-color: var(--vscode-button-secondaryHoverBackground);
+            border-color: var(--vscode-focusBorder);
+            transform: translateY(-1px);
           }
 
           /* Examples selection styles */
@@ -1086,8 +1098,12 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           <div class="messages" id="messages">
             <div class="empty-state" id="emptyState">
               <img src="${mediaSrc}/icon.png" alt="TestDriver" class="helmet-large" />
-              <h3>TestDriver.ai</h3>
+              <h3>Welcome to TestDriver.ai</h3>
+              <p>Your AI-powered testing assistant. Describe what you want to test and I'll help you create automated test steps.</p>
               <div class="example-prompts" id="examplePrompts">
+                <button class="example-prompt" onclick="fillInput('Assert the app loads proplerly')">Assert the app loaded</button>
+                <button class="example-prompt" onclick="fillInput('Test the login form with valid credentials')">Test the login form with valid credentials</button>
+                <button class="example-prompt" onclick="fillInput('Close the browser')">Close the browser</button>
               </div>
             </div>
           </div>
