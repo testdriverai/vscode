@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { showTestDriverExamples, handleChatMessage, stopTestExecution } from '../commands/chat';
 import { openInBottomGroup } from './layout';
 
@@ -6,6 +7,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'testdriver-sidebar';
 
   private _view?: vscode.WebviewView;
+  private _selectedFilePath = 'testdriver/testdriver.yaml';
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -39,7 +41,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           break;
         }
         case 'sendMessage': {
-          await handleChatMessage(message.message, webviewView, this._context);
+          await handleChatMessage(message.message, webviewView, this._context, this._selectedFilePath);
           break;
         }
         case 'runTests': {
@@ -48,6 +50,14 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
         }
         case 'stopTest': {
           await this._handleStopTest(webviewView);
+          break;
+        }
+        case 'selectFile': {
+          await this._handleSelectFile(webviewView);
+          break;
+        }
+        case 'openCurrentFile': {
+          await this._handleOpenCurrentFile();
           break;
         }
       }
@@ -73,6 +83,10 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  public getSelectedFilePath(): string {
+    return this._selectedFilePath;
+  }
+
   private _updateFileIndicator(workspaceName: string, fileName: string) {
     if (this._view) {
       this._view.webview.postMessage({
@@ -91,7 +105,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
   private async _handleStopTest(webviewView: vscode.WebviewView) {
     try {
       console.log('Stopping TestDriver test execution...');
-      await stopTestExecution();
+      await stopTestExecution(webviewView);
 
       // Send message to webview to reset the UI state
       webviewView.webview.postMessage({
@@ -101,6 +115,126 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       console.error('Error stopping test:', error);
       vscode.window.showErrorMessage('Failed to stop TestDriver test: ' + (error as Error).message);
+    }
+  }
+
+  private async _handleSelectFile(webviewView: vscode.WebviewView) {
+    try {
+      console.log('Opening file selector...');
+
+      // Get the current workspace folder
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return;
+      }
+
+      const workspaceFolder = workspaceFolders[0];
+
+      // Look for YAML files in the testdriver folder and workspace root
+      const yamlFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(workspaceFolder, '**/*.{yml,yaml}'),
+        new vscode.RelativePattern(workspaceFolder, 'node_modules/**'),
+        50
+      );
+
+      if (yamlFiles.length === 0) {
+        vscode.window.showErrorMessage('No YAML files found in the workspace');
+        return;
+      }
+
+      // Convert file URIs to relative paths for display
+      const fileOptions = yamlFiles.map(fileUri => {
+        const relativePath = vscode.workspace.asRelativePath(fileUri);
+        return {
+          label: relativePath,
+          description: relativePath.includes('testdriver/') ? 'TestDriver file' : 'YAML file',
+          uri: fileUri
+        };
+      });
+
+      // Sort to prioritize testdriver files
+      fileOptions.sort((a, b) => {
+        if (a.label.includes('testdriver/') && !b.label.includes('testdriver/')) {
+          return -1;
+        }
+        if (!a.label.includes('testdriver/') && b.label.includes('testdriver/')) {
+          return 1;
+        }
+        return a.label.localeCompare(b.label);
+      });
+
+      // Show quick pick
+      const selectedFile = await vscode.window.showQuickPick(fileOptions, {
+        placeHolder: 'Select a YAML file for TestDriver chat',
+        matchOnDescription: true
+      });
+
+      if (!selectedFile) {
+        return; // User cancelled
+      }
+
+      const relativePath = selectedFile.label;
+      console.log('Selected file:', relativePath);
+
+      // Clear the chat and start fresh with the new file
+      webviewView.webview.postMessage({
+        command: 'clearChat'
+      });
+
+      // Update the file indicator
+      webviewView.webview.postMessage({
+        command: 'updateFileIndicator',
+        workspaceName: workspaceFolder.name,
+        fileName: relativePath
+      });
+
+      // Store the selected file path for use in chat messages
+      this._selectedFilePath = relativePath;
+
+      vscode.window.showInformationMessage(`Started new chat with file: ${relativePath}`);
+
+    } catch (error) {
+      console.error('Error selecting file:', error);
+      vscode.window.showErrorMessage('Failed to select file: ' + (error as Error).message);
+    }
+  }
+
+  private async _handleOpenCurrentFile() {
+    try {
+      console.log('Opening current file:', this._selectedFilePath);
+
+      // Get the current workspace folder
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder found');
+        return;
+      }
+
+      const workspaceFolder = workspaceFolders[0];
+      const filePath = path.join(workspaceFolder.uri.fsPath, this._selectedFilePath);
+      const fileUri = vscode.Uri.file(filePath);
+
+      // Check if file exists
+      try {
+        await vscode.workspace.fs.stat(fileUri);
+      } catch {
+        vscode.window.showErrorMessage(`File not found: ${this._selectedFilePath}`);
+        return;
+      }
+
+      // Open the file in the editor
+      const document = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(document, {
+        preview: false,
+        viewColumn: vscode.ViewColumn.One
+      });
+
+      console.log(`Successfully opened file: ${this._selectedFilePath}`);
+
+    } catch (error) {
+      console.error('Error opening current file:', error);
+      vscode.window.showErrorMessage('Failed to open file: ' + (error as Error).message);
     }
   }
 
@@ -397,21 +531,35 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             background-color: var(--vscode-sideBar-background);
             border-top: 1px solid var(--vscode-sideBar-border);
             flex-shrink: 0;
-            display: none; /* Hidden by default */
+            display: block; /* Always visible */
             border-left: 3px solid var(--vscode-testing-runAction);
             font-size: 11px;
-          }
-
-          .file-indicator.visible {
-            display: block;
           }
 
           .file-info {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 6px;
             font-size: 12px;
             color: var(--vscode-descriptionForeground);
+          }
+
+          .select-file-button {
+            background: none;
+            border: none;
+            color: var(--vscode-textLink-foreground);
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-size: 12px;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+          }
+
+          .select-file-button:hover {
+            opacity: 1;
+            background-color: var(--vscode-button-secondaryHoverBackground);
           }
 
           .file-icon {
@@ -424,6 +572,17 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .file-path {
             color: var(--vscode-textLink-foreground);
             font-size: 12px;
+          }
+
+          .file-path.clickable {
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-color: transparent;
+            transition: text-decoration-color 0.2s ease;
+          }
+
+          .file-path.clickable:hover {
+            text-decoration-color: var(--vscode-textLink-foreground);
           }
 
           .workspace-name {
@@ -454,7 +613,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             display: flex;
             align-items: flex-start;
             gap: 8px;
-            font-size: 12px;
+            font-size: 13px;
           }
 
           .message.user {
@@ -522,7 +681,6 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
             padding: 8px;
             font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
-            font-size: 11px;
             color: var(--vscode-errorForeground, #f14c4c);
             white-space: pre-wrap;
             word-break: break-word;
@@ -550,7 +708,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
             padding: 8px; /* Slightly more padding since no message background */
             margin: 4px 0;
-            font-family: var(--vscode-editor-font-family), 'Courier New', monospace;
+            font-family: var(--vscode-editor-font-family), "Droid Sans Mono", Menlo, Monaco, "Courier New", monospace;
             font-size: 10px;
             overflow-x: auto;
             overflow-y: hidden;
@@ -560,6 +718,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           }
 
           .code-block.yaml {
+            border: none !important;
             border-left: 3px solid var(--vscode-textLink-foreground);
             background-color: var(--vscode-textBlockQuote-background);
           }
@@ -768,48 +927,60 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             height: 100%;
             text-align: center;
             color: var(--vscode-descriptionForeground);
-            padding: 16px;
+            padding: 24px 16px;
           }
 
           .empty-state .helmet-large {
-            width: 32px;
-            height: 32px;
-            margin-bottom: 12px;
-            opacity: 0.6;
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            opacity: 0.8;
           }
 
           .empty-state h3 {
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 600;
             margin-bottom: 8px;
+            color: var(--vscode-foreground);
           }
 
           .empty-state p {
-            font-size: 12px;
-            line-height: 1.4;
-            margin-bottom: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            max-width: 280px;
+            color: var(--vscode-descriptionForeground);
           }
 
           .example-prompts {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
             width: 100%;
+            max-width: 280px;
           }
 
           .example-prompt {
             background-color: var(--vscode-button-secondaryBackground);
             color: var(--vscode-button-secondaryForeground);
-            border: none;
-            border-radius: 3px;
-            padding: 4px 6px;
+            border: 1px solid var(--vscode-button-border, transparent);
+            border-radius: 6px;
+            padding: 8px 12px;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 12px;
             text-align: left;
             line-height: 1.3;
+            transition: all 0.15s ease;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
           }
 
           .example-prompt:hover {
             background-color: var(--vscode-button-secondaryHoverBackground);
+            border-color: var(--vscode-focusBorder);
+            transform: translateY(-1px);
           }
 
           /* Examples selection styles */
@@ -927,15 +1098,22 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           <div class="messages" id="messages">
             <div class="empty-state" id="emptyState">
               <img src="${mediaSrc}/icon.png" alt="TestDriver" class="helmet-large" />
-              <h3>TestDriver.ai</h3>
+              <h3>Welcome to TestDriver.ai</h3>
+              <p>Your AI-powered testing assistant. Describe what you want to test and I'll help you create automated test steps.</p>
               <div class="example-prompts" id="examplePrompts">
+                <button class="example-prompt" onclick="fillInput('Assert the app loads proplerly')">Assert the app loaded</button>
+                <button class="example-prompt" onclick="fillInput('Test the login form with valid credentials')">Test the login form with valid credentials</button>
+                <button class="example-prompt" onclick="fillInput('Close the browser')">Close the browser</button>
               </div>
             </div>
           </div>
 
           <div class="file-indicator" id="fileIndicator">
             <div class="file-info">
-              <span class="file-path" id="currentFile">No file selected</span>
+              <span class="file-path clickable" id="currentFile" title="Click to open file">testdriver/testdriver.yaml</span>
+              <button id="selectFileButton" class="select-file-button" title="Select a different file">
+                <span class="codicon codicon-folder-opened"></span>
+              </button>
             </div>
           </div>
 
@@ -951,6 +1129,9 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             </div>
           </div>
         </div>
+
+        <!-- Marked.js for markdown processing -->
+        <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
 
         <!-- Prism.js for syntax highlighting -->
         <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet" />

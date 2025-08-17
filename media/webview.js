@@ -18,8 +18,80 @@ class TestDriverWebview {
     this.setupEventListeners();
     this.focusInput();
 
+    // Wait for marked to be available before configuring
+    this.waitForMarkedAndConfigure();
+
     // Signal that the webview is ready to receive messages
     this.vscode.postMessage({ command: 'webviewReady' });
+  }
+
+  waitForMarkedAndConfigure() {
+    let attempts = 0;
+    const maxAttempts = 50; // 5 seconds max
+
+    const checkAndConfigure = () => {
+      attempts++;
+      console.log(`Attempt ${attempts}: Checking for marked...`);
+
+      if (typeof marked !== 'undefined') {
+        console.log('Marked found, configuring...');
+        this.configureMarked();
+      } else if (attempts < maxAttempts) {
+        console.log('Marked not ready yet, retrying...');
+        setTimeout(checkAndConfigure, 100);
+      } else {
+        console.error('Marked failed to load after', maxAttempts, 'attempts');
+      }
+    };
+
+    checkAndConfigure();
+  }
+
+  configureMarked() {
+    // Configure marked once during initialization
+    console.log('Configuring marked, available:', typeof marked !== 'undefined');
+    if (typeof marked !== 'undefined') {
+      const renderer = new marked.Renderer();
+
+      // Override code block rendering to use YAML syntax highlighting
+      renderer.code = function(code, language) {
+        console.log('Rendering code block, language:', language, 'code:', code.substring(0, 50));
+        // Default to yaml if no language specified or if it's yaml/yml
+        const lang = language && language.toLowerCase();
+        const isYaml = !lang || lang === 'yaml' || lang === 'yml';
+        const finalLang = isYaml ? 'yaml' : lang;
+
+        // Clean the code to preserve whitespace
+        const cleanCode = code.replace(/^\n/, '').replace(/\n$/, '');
+
+        console.log('Will render as YAML:', isYaml, 'final language:', finalLang);
+
+        if (isYaml) {
+          return '<pre class="code-block yaml"><code class="language-yaml">' +
+            cleanCode + '</code></pre>';
+        } else {
+          return '<pre class="code-block"><code class="language-' + finalLang + '">' +
+            cleanCode + '</code></pre>';
+        }
+      };
+
+      // Override inline code rendering
+      renderer.codespan = function(code) {
+        return '<code class="inline-code">' + code + '</code>';
+      };
+
+      // Configure marked options
+      marked.setOptions({
+        renderer: renderer,
+        breaks: true, // Convert \n to <br>
+        gfm: true,    // GitHub Flavored Markdown
+        sanitize: false
+      });
+
+      console.log('Marked configured successfully with custom renderer');
+    } else {
+      console.error('Cannot configure marked - library not available');
+    }
   }
 
   setupEventListeners() {
@@ -62,6 +134,22 @@ class TestDriverWebview {
       this.chatInput.style.height = 'auto';
       this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 80) + 'px';
     });
+
+    // File selector button
+    const selectFileButton = document.getElementById('selectFileButton');
+    if (selectFileButton) {
+      selectFileButton.addEventListener('click', () => {
+        this.selectFile();
+      });
+    }
+
+    // File path click handler to open file
+    const currentFileElement = document.getElementById('currentFile');
+    if (currentFileElement) {
+      currentFileElement.addEventListener('click', () => {
+        this.openCurrentFile();
+      });
+    }
 
     // Handle messages from the extension
     window.addEventListener('message', (event) => {
@@ -119,6 +207,9 @@ class TestDriverWebview {
           break;
         case 'updateFileIndicator':
           this.updateFileIndicator(message.workspaceName, message.fileName);
+          break;
+        case 'clearChat':
+          this.clearChat();
           break;
         case 'showRunButton':
           this.showRunButton();
@@ -251,6 +342,10 @@ class TestDriverWebview {
 
   stopTest() {
     console.log('Stopping test execution...');
+
+    // Stop any loading spinners immediately
+    this.completeLoadingSpinner();
+
     this.addMessage('🛑 Stopping test execution...', 'status', '🛑');
 
     this.vscode.postMessage({
@@ -307,81 +402,50 @@ class TestDriverWebview {
   }
 
   processMarkdown(text) {
-
     console.log('Processing markdown:', text);
+    console.log('Marked available:', typeof marked !== 'undefined');
 
-    // Store code blocks temporarily to avoid processing them with line break conversion
-    const codeBlocks = [];
-    let codeBlockIndex = 0;
-
-    // Convert code blocks to syntax highlighted blocks using Prism.js
-    text = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
-      // Default to yaml if no language specified or if it's yaml/yml
-      const lang = language && language.toLowerCase();
-      const isYaml = !lang || lang === 'yaml' || lang === 'yml';
-      const finalLang = isYaml ? 'yaml' : lang;
-
-      // Preserve original whitespace and line breaks in code
-      const cleanCode = code.replace(/^\n/, '').replace(/\n$/, '');
-
-      let codeBlock;
-      if (isYaml) {
-        codeBlock = '<pre class="code-block yaml"><code class="language-yaml">' +
-          cleanCode + '</code></pre>';
-      } else {
-        codeBlock = '<pre class="code-block"><code class="language-' + finalLang + '">' +
-         cleanCode + '</code></pre>';
+    // Process the markdown using marked (configured during init)
+    let processed;
+    if (typeof marked !== 'undefined') {
+      try {
+        processed = marked.parse(text);
+        console.log('Processed with marked:', processed.substring(0, 100));
+      } catch (error) {
+        console.error('Error processing with marked:', error);
+        processed = text;
       }
+    } else {
+      console.log('Marked not available, using raw text');
+      processed = text;
+    }
 
-      // Store the code block and return a placeholder
-      const placeholder = `__CODEBLOCK_${codeBlockIndex}__`;
-      codeBlocks.push(codeBlock);
-      codeBlockIndex++;
-      return placeholder;
-    });
+    // Trigger Prism.js syntax highlighting after DOM update
+    setTimeout(() => {
+      if (window.Prism) {
+        window.Prism.highlightAll();
+      }
+    }, 0);
 
-    // Convert inline code (also protect from line break conversion)
-    const inlineCodes = [];
-    let inlineIndex = 0;
-    text = text.replace(/`([^`]+)`/g, (match, code) => {
-      const placeholder = `__INLINECODE_${inlineIndex}__`;
-      inlineCodes.push(`<code class="inline-code">${code}</code>`);
-      inlineIndex++;
-      return placeholder;
-    });
-
-    // Convert headers
-    text = text.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-    text = text.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-    text = text.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-
-    // Convert bold and italic
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-    // Convert line breaks (but not in code blocks)
-    text = text.replace(/\n/g, '<br>');
-
-    // Restore code blocks
-    codeBlocks.forEach((block, index) => {
-      text = text.replace(`__CODEBLOCK_${index}__`, block);
-    });
-
-    // Restore inline code
-    inlineCodes.forEach((code, index) => {
-      text = text.replace(`__INLINECODE_${index}__`, code);
-    });
-
-    return text;
+    return processed;
   }
 
   highlightCodeBlocks() {
     // Use Prism.js to highlight all code blocks
+    console.log('highlightCodeBlocks called, Prism available:', !!window.Prism);
     if (window.Prism && window.Prism.highlightAll) {
       // Small delay to ensure DOM is updated
       setTimeout(() => {
+        console.log('Running Prism.highlightAll()');
+        const codeBlocks = document.querySelectorAll('pre code');
+        console.log('Found code blocks:', codeBlocks.length);
+        codeBlocks.forEach((block, index) => {
+          console.log(`Code block ${index}:`, block.className, block.textContent.substring(0, 50));
+        });
         window.Prism.highlightAll();
       }, 0);
+    } else {
+      console.log('Prism not available for highlighting');
     }
   }
 
@@ -454,6 +518,12 @@ class TestDriverWebview {
       case 'error:sdk':
       case 'error:sandbox':
         this.addMessage(String(mainData), 'error', '❌');
+        break;
+
+      case 'exit':
+        // Agent has exited - complete any loading spinner and reset state
+        this.completeLoadingSpinner();
+        console.log('Agent exited with code:', mainData);
         break;
 
       default:
@@ -563,13 +633,12 @@ class TestDriverWebview {
 
   updateFileIndicator(workspaceName, fileName) {
     const fileIndicator = document.getElementById('fileIndicator');
-    const workspaceNameElement = document.getElementById('workspaceName');
     const currentFileElement = document.getElementById('currentFile');
 
-    if (fileIndicator && workspaceNameElement && currentFileElement) {
-      workspaceNameElement.textContent = workspaceName;
+    if (fileIndicator && currentFileElement) {
       currentFileElement.textContent = fileName;
-      fileIndicator.classList.add('visible');
+      // File indicator should always be visible now
+      fileIndicator.style.display = 'block';
     }
   }
 
@@ -665,6 +734,46 @@ class TestDriverWebview {
       }, 1000);
     }
   }
+
+  selectFile() {
+    this.vscode.postMessage({
+      command: 'selectFile'
+    });
+  }
+
+  openCurrentFile() {
+    this.vscode.postMessage({
+      command: 'openCurrentFile'
+    });
+  }
+
+  clearChat() {
+    // Clear all messages except the empty state
+    this.messagesContainer.innerHTML = '';
+
+    // Restore empty state
+    this.messagesContainer.appendChild(this.emptyState);
+    this.emptyState.style.display = 'flex';
+
+    // Reset running state
+    this.isRunning = false;
+    this.sendButton.disabled = false;
+    this.sendButton.textContent = 'Generate Test Steps';
+
+    if (this.runButton) {
+      this.runButton.disabled = false;
+      this.runButton.textContent = 'Run';
+    }
+    if (this.runButtonTop) {
+      this.runButtonTop.disabled = false;
+      this.runButtonTop.textContent = 'Run';
+    }
+
+    // Clear streaming messages
+    this.streamingMessages.clear();
+
+    this.focusInput();
+  }
 }
 
 // Global function for example prompts
@@ -684,6 +793,34 @@ function selectExample(exampleName) {
     });
   }
 }
+
+// Global function to fill input from example prompts and send the message
+window.fillInput = function(text) {
+  console.log('fillInput called with:', text);
+  console.log('testDriverWebview available:', !!window.testDriverWebview);
+
+  if (window.testDriverWebview && window.testDriverWebview.chatInput) {
+    console.log('Setting input value and sending message');
+    window.testDriverWebview.chatInput.value = text;
+    window.testDriverWebview.chatInput.focus();
+    // Auto-resize the textarea
+    window.testDriverWebview.chatInput.style.height = 'auto';
+    window.testDriverWebview.chatInput.style.height = window.testDriverWebview.chatInput.scrollHeight + 'px';
+
+    // Automatically send the message
+    try {
+      window.testDriverWebview.sendMessage();
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  } else {
+    console.error('testDriverWebview or chatInput not available');
+    console.log('testDriverWebview:', window.testDriverWebview);
+    if (window.testDriverWebview) {
+      console.log('chatInput:', window.testDriverWebview.chatInput);
+    }
+  }
+};
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
