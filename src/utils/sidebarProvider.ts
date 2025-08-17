@@ -709,7 +709,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             padding: 8px; /* Slightly more padding since no message background */
             margin: 4px 0;
             font-family: var(--vscode-editor-font-family), "Droid Sans Mono", Menlo, Monaco, "Courier New", monospace;
-            font-size: 10px;
+            font-size: 12px;
             overflow-x: auto;
             overflow-y: hidden;
             white-space: pre;
@@ -753,7 +753,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .token.prolog,
           .token.doctype,
           .token.cdata {
-            color: var(--vscode-editor-comment-foreground, #6A9955) !important;
+            color: var( #b3d334) !important;
           }
 
           .token.property,
@@ -763,7 +763,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .token.constant,
           .token.symbol,
           .token.deleted {
-            color: var(--vscode-symbolIcon-numberForeground, #B5CEA8) !important;
+            color: var( #b3d334) !important;
           }
 
           .token.selector,
@@ -772,7 +772,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .token.char,
           .token.builtin,
           .token.inserted {
-            color: var(--vscode-symbolIcon-stringForeground, #CE9178) !important;
+            color: var(#34d3d3) !important;
           }
 
           .token.operator,
@@ -786,18 +786,18 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .token.atrule,
           .token.attr-value,
           .token.keyword {
-            color: var(--vscode-symbolIcon-keywordForeground, #569CD6) !important;
+            color: var(#34d3d3) !important;
           }
 
           .token.function,
           .token.class-name {
-            color: var(--vscode-symbolIcon-functionForeground, #DCDCAA) !important;
+            color: var(#DCDCAA) !important;
           }
 
           .token.regex,
           .token.important,
           .token.variable {
-            color: var(--vscode-symbolIcon-variableForeground, #9CDCFE) !important;
+            color: var(#9CDCFE) !important;
           }
 
           /* VS Code icon styling */
