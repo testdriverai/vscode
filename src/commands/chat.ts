@@ -796,6 +796,14 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
           });
         });
 
+        // Start the agent first
+        console.log('Starting agent...');
+        await agent.start();
+
+        // Build the environment (sandbox) for interactive mode
+        console.log('Building environment...');
+        await agent.buildEnv({ });
+
         // Handle step:start events to open and highlight files
         agent.emitter.on('step:start', async (data: EventData) => {
           console.log('Step started - full data:', JSON.stringify(data, null, 2));
@@ -1074,14 +1082,6 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
           const testFileName = 'TestDriver Session';
           await openTestDriverWebview(context, url, `${testFileName} - TestDriver`);
         });
-
-        // Start the agent first
-        console.log('Starting agent...');
-        await agent.start();
-
-        // Build the environment (sandbox) for interactive mode
-        console.log('Building environment...');
-        await agent.buildEnv({ });
 
         // Load existing file content into executionHistory to append new commands instead of overwriting
         // This mimics what the readline interface does in its start() method
