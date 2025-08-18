@@ -21,23 +21,23 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '22'
+      # - name: Set up Node.js
+      #   uses: actions/setup-node@v3
+      #   with:
+      #     node-version: '22'
 
-      - name: Install global dependencies
-        run: |
-          npm install -g typescript prettier eslint vsce
+      # - name: Install global dependencies
+      #   run: |
+      #     npm install -g typescript prettier eslint vsce
 
-      - name: Install project dependencies
-        run: npm install
+      # - name: Install project dependencies
+      #   run: npm install
 
-      - name: Bump package version
-        run: npm version patch --no-git-tag-version
+      # - name: Bump package version
+      #   run: npm version patch --no-git-tag-version
 
-      - name: Install latest testdriverai@latest
-        run: npm install testdriverai@latest --save
+      # - name: Install latest testdriverai@latest
+      #   run: npm install testdriverai@latest --save
 
       # - name: Commit package updates
       #   run: |
