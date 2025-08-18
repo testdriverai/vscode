@@ -64,8 +64,8 @@ jobs:
           fi
           echo "vsix_path=$VSIX_PATH" >> $GITHUB_OUTPUT
 
-      - name: Publish to vsce
-        run: npx vsce publish --pat ${{ secrets.VSCODE_PUBLISH_PAT }}
+      # - name: Publish to vsce
+      #   run: npx vsce publish --pat ${{ secrets.VSCODE_PUBLISH_PAT }}
 
       - name: Publish to OpenVSIX
         run: npx openvsix publish --token ${{ secrets.OPENVSIX_PUBLISH_TOKEN }}
