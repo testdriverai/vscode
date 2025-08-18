@@ -69,6 +69,9 @@ jobs:
       - name: Publish to vsce
         run: npx vsce publish --pat ${{ secrets.VSCODE_PUBLISH_PAT }}
 
+      - name: Publish to OpenVSIX
+        run: npx openvsix publish --token ${{ secrets.OPENVSIX_PUBLISH_TOKEN }}
+
       - name: Extract version from package.json
         id: get_version
         run: |
