@@ -1102,7 +1102,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
               <h3>Welcome to TestDriver.ai</h3>
               <p>Your AI-powered testing assistant. Describe what you want to test and I'll help you create automated test steps.</p>
               <div class="example-prompts" id="examplePrompts">
-                <button class="example-prompt" onclick="fillInput('Assert the app loads proplerly')">Assert the app loaded</button>
+                <button class="example-prompt" onclick="fillInput('Assert the app loads properly')">Assert the app loaded</button>
                 <button class="example-prompt" onclick="fillInput('Test the login form with valid credentials')">Test the login form with valid credentials</button>
                 <button class="example-prompt" onclick="fillInput('Close the browser')">Close the browser</button>
               </div>

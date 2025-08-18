@@ -110,7 +110,7 @@
       "testdriver-activity": [
         {
           "id": "testdriver-sidebar",
-          "name": "Chat",
+          "name": "Agent",
           "type": "webview",
           "icon": "$(comment-discussion)"
         }
