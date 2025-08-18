@@ -39,16 +39,16 @@ jobs:
       - name: Install latest testdriverai@latest
         run: npm install testdriverai@latest --save
 
-      - name: Commit package updates
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git pull origin main
-          git add package.json package-lock.json
-          git commit -m "Bump version and update testdriverai@latest [skip ci]" || exit 0
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Commit package updates
+      #   run: |
+      #     git config --local user.email "action@github.com"
+      #     git config --local user.name "GitHub Action"
+      #     git pull origin main
+      #     git add package.json package-lock.json
+      #     git commit -m "Bump version and update testdriverai@latest [skip ci]" || exit 0
+      #     git push
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build .vsix package
         run: npx vsce package
