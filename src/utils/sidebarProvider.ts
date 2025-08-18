@@ -714,6 +714,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             overflow-y: hidden;
             white-space: pre;
             max-width: 100%;
+            color: #b3d334 !important;
             word-wrap: normal; /* Don't break words in code */
           }
 
@@ -729,7 +730,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
             padding: 0 !important;
             margin: 0 !important;
             font-family: inherit !important;
-            color: var(--vscode-editor-foreground) !important;
+            color: #b3d334 !important;
             white-space: pre;
             overflow-wrap: normal;
           }
@@ -745,7 +746,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
           .code-block code[class*="language-"] {
             background: none !important;
-            color: var(--vscode-editor-foreground) !important;
+            color: #b3d334 !important;
           }
 
           /* Override Prism.js tokens to use VS Code colors */
@@ -763,7 +764,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .token.constant,
           .token.symbol,
           .token.deleted {
-            color: var( #b3d334) !important;
+            color: #b3d334 !important;
           }
 
           .token.selector,
@@ -772,7 +773,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .token.char,
           .token.builtin,
           .token.inserted {
-            color: var(#34d3d3) !important;
+            color: #b3d334 !important;
           }
 
           .token.operator,
@@ -786,18 +787,18 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           .token.atrule,
           .token.attr-value,
           .token.keyword {
-            color: var(#34d3d3) !important;
+            color: #34d3d3 !important;
           }
 
           .token.function,
           .token.class-name {
-            color: var(#DCDCAA) !important;
+            color: #DCDCAA !important;
           }
 
           .token.regex,
           .token.important,
           .token.variable {
-            color: var(#9CDCFE) !important;
+            color: #9CDCFE !important;
           }
 
           /* VS Code icon styling */
@@ -1101,7 +1102,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
               <h3>Welcome to TestDriver.ai</h3>
               <p>Your AI-powered testing assistant. Describe what you want to test and I'll help you create automated test steps.</p>
               <div class="example-prompts" id="examplePrompts">
-                <button class="example-prompt" onclick="fillInput('Assert the app loads proplerly')">Assert the app loaded</button>
+                <button class="example-prompt" onclick="fillInput('Assert the app loads properly')">Assert the app loaded</button>
                 <button class="example-prompt" onclick="fillInput('Test the login form with valid credentials')">Test the login form with valid credentials</button>
                 <button class="example-prompt" onclick="fillInput('Close the browser')">Close the browser</button>
               </div>
