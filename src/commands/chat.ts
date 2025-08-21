@@ -573,6 +573,11 @@ async function copyExampleToWorkspace(exampleName: string, workspaceFolder: vsco
       fileName: mainFileName
     });
 
+    // Show suggested prompts after copying example
+    webview.postMessage({
+      command: 'showSuggestedPromptsAfterExample'
+    });
+
     webview.postMessage({
       command: 'chatResponse'
     });

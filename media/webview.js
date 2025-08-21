@@ -10,6 +10,7 @@ class TestDriverWebview {
     this.emptyState = document.getElementById('emptyState');
     this.isRunning = false;
     this.streamingMessages = new Map();
+    this.showSuggestedAfterExample = false; // Track if we should show suggested prompts after example
 
     this.init();
   }
@@ -223,6 +224,9 @@ class TestDriverWebview {
         case 'showInputAndRunButton':
           this.showInputAndRunButton();
           break;
+        case 'showSuggestedPromptsAfterExample':
+          this.showSuggestedPromptsAfterExample();
+          break;
         case 'error':
           this.addMessage(message.data, 'error', '❌');
           this.isRunning = false;
@@ -252,7 +256,11 @@ class TestDriverWebview {
   }
 
   addMessage(content, type = 'assistant', _avatar = '🤖') {
-    this.hideEmptyState();
+    // Only hide empty state if we're not showing suggested prompts after example
+    // or if this is a user message (which should always hide empty state)
+    if (!this.showSuggestedAfterExample || type === 'user') {
+      this.hideEmptyState();
+    }
 
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}`;
@@ -326,6 +334,12 @@ class TestDriverWebview {
     const message = this.chatInput.value.trim();
     if (!message) {
       return;
+    }
+
+    // If we're showing suggested prompts after example, hide them now on first user message
+    if (this.showSuggestedAfterExample) {
+      this.hideEmptyState();
+      this.showSuggestedAfterExample = false;
     }
 
     this.addMessage(message, 'user');
@@ -667,6 +681,28 @@ class TestDriverWebview {
     const inputContainer = document.querySelector('.input-container');
     if (inputContainer) {
       inputContainer.style.display = 'flex';
+    }
+  }
+
+  showSuggestedPromptsAfterExample() {
+    // Set flag to show suggested prompts and keep them visible until first user message
+    this.showSuggestedAfterExample = true;
+
+    // Ensure the empty state is visible with suggested prompts
+    if (this.emptyState) {
+      this.emptyState.style.display = 'flex';
+
+      // Restore the complete empty state HTML with the correct suggested prompts
+      this.emptyState.innerHTML = `
+        <img src="${window.mediaSrc}/icon.png" alt="TestDriver" class="helmet-large" />
+        <h3>Example copied successfully!</h3>
+        <p>Your test file has been created. Try one of these prompts to get started:</p>
+        <div class="example-prompts" id="examplePrompts">
+          <button class="example-prompt" onclick="fillInput('Assert the app loads properly')">Assert the app loaded</button>
+          <button class="example-prompt" onclick="fillInput('Test the login form with valid credentials')">Test the login form with valid credentials</button>
+          <button class="example-prompt" onclick="fillInput('Close the browser')">Close the browser</button>
+        </div>
+      `;
     }
   }
 

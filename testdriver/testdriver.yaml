@@ -1,0 +1,13 @@
+version: 6.0.20
+session: 68a3851d07c3e65375e906fe
+steps:
+  - prompt: Assert the app loads proplerly
+    commands:
+      - command: hover-text
+        text: Google Chrome
+        description: >-
+          Google Chrome shortcut icon on the desktop with a circular red, green,
+          yellow, and blue icon
+        action: double-click
+      - command: wait
+        timeout: 3000
