@@ -227,6 +227,9 @@ class TestDriverWebview {
         case 'showSuggestedPromptsAfterExample':
           this.showSuggestedPromptsAfterExample();
           break;
+        case 'showNoWorkspaceMessage':
+          this.showNoWorkspaceMessage();
+          break;
         case 'error':
           this.addMessage(message.data, 'error', '❌');
           this.isRunning = false;
@@ -681,6 +684,20 @@ class TestDriverWebview {
     const inputContainer = document.querySelector('.input-container');
     if (inputContainer) {
       inputContainer.style.display = 'flex';
+    }
+  }
+
+  showNoWorkspaceMessage() {
+    // Clear any existing messages
+    this.clearChat();
+
+    // Show a message indicating no workspace is available
+    this.addMessage('📁 No workspace folder is open', 'system', '📁');
+    this.addMessage('Please open a folder to get started with TestDriver. Go to File → Open Folder... to select a project folder.', 'system', 'ℹ️');
+
+    // Ensure empty state is hidden since we're showing messages
+    if (this.emptyState) {
+      this.emptyState.style.display = 'none';
     }
   }
 
