@@ -313,6 +313,14 @@ export function registerChatCommand(context: vscode.ExtensionContext) {
 
     // Focus on the TestDriver sidebar view instead of creating a separate webview panel
     await vscode.commands.executeCommand('testdriver-sidebar.focus');
+
+    // Set context to indicate chat has been opened for walkthrough completion
+    await vscode.commands.executeCommand('setContext', 'testdriver.chatOpened', true);
+
+    // Persist this state for future sessions
+    await context.globalState.update('testdriver.chatOpenedBefore', true);
+
+    return true; // Return success for walkthrough completion
   });
 
   context.subscriptions.push(disposable);
