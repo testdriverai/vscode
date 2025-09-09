@@ -756,7 +756,8 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
         command: 'edit',
         args: [targetFilePath], // Use the selected file path
         options: {
-          // new: true
+          workingDir: workingDir,
+          new: true
         },
       };
 
@@ -788,7 +789,6 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
         // Unified event forwarding - listen to all events and forward them to webview
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         agent.emitter.onAny((eventName: string, ...args: any[]) => {
-          console.log('Received agent event:', eventName, args);
 
           // Process event data differently for error events vs regular events
           let processedArgs: unknown[];
@@ -825,6 +825,11 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
         // Build the environment (sandbox) for interactive mode
         console.log('Building environment...');
         await agent.buildEnv({ });
+
+        console.log('running provision...');
+        await agent.runLifecycle('provision');
+        console.log('running prerun...');
+        await agent.runLifecycle('prerun');
 
         // Handle step:start events to open and highlight files
         agent.emitter.on('step:start', async (data: EventData) => {
@@ -1199,6 +1204,7 @@ async function handleChatMessage(userMessage: string, panel: vscode.WebviewPanel
           // Use unified command system like readline does
           await agent.executeUnifiedCommand(commandName, cleanArgs, options);
         } else {
+
           // Handle regular exploratory input like readline does
           await agent.exploratoryLoop(
             processedMessage.replace(/^\/explore\s+/, ""),
