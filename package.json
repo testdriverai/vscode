@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/testdriverai/testdriverai"
   },
-  "version": "0.6.51",
+  "version": "0.6.56",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -46,7 +46,7 @@
           {
             "id": "signup",
             "title": "Get a TestDriver API Key",
-            "description": "Because TestDriver is powered by agentic users, a free account is required to access:\n\n - Dedicated Virtual Machines (VMs) for running agents\n- TestDriver AI + Vision models\n- Community support\n[Get API Key](https://app.testdriver.ai/)",
+            "description": "An account is required to access TestDriver's AI Model as well as sandbox environments for running tests..\n[Get API Key](https://app.testdriver.ai/)",
             "media": {
               "image": "media/main.png",
               "altText": "TestDriver main interface"
@@ -64,7 +64,7 @@
               "altText": "TestDriver API key setup"
             },
             "completionEvents": [
-              "command:testdriver.setApiKey"
+              "onContext:testdriver.hasApiKey"
             ]
           },
           {
@@ -76,7 +76,7 @@
               "altText": "TestDriver chat interface"
             },
             "completionEvents": [
-              "command:testdriver.openChat"
+              "onContext:testdriver.chatOpened"
             ]
           },
           {
@@ -88,7 +88,7 @@
               "altText": "TestDriver run test interface"
             },
             "completionEvents": [
-              "command:testdriver.runTest"
+              "onContext:testdriver.testPanelOpened"
             ]
           },
           {
@@ -187,7 +187,7 @@
     "dotenv": "^16.4.5",
     "prismjs": "^1.30.0",
     "strip-ansi": "^7.1.0",
-    "testdriverai": "^6.0.23",
+    "testdriverai": "^6.0.27",
     "vscode-languageclient": "^9.0.0",
     "winston": "^3.17.0"
   },

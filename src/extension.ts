@@ -68,6 +68,33 @@ export async function activate(context: vscode.ExtensionContext) {
   registerTestdriverRunTest(context);
   registerTestdriverChat(context);
 
+  // Check if API key is already set and mark walkthrough step as complete if needed
+  const existingApiKey = await context.secrets.get('TD_API_KEY');
+  if (existingApiKey) {
+    logger.info('API key already exists, walkthrough step should be complete');
+    vscode.commands.executeCommand('setContext', 'testdriver.hasApiKey', true);
+  } else {
+    vscode.commands.executeCommand('setContext', 'testdriver.hasApiKey', false);
+  }
+
+  // Check if chat has been opened before (for returning users)
+  const chatOpenedBefore = context.globalState.get('testdriver.chatOpenedBefore', false);
+  if (chatOpenedBefore || !isFirstInstall) {
+    // If not first install, assume chat has been opened before
+    vscode.commands.executeCommand('setContext', 'testdriver.chatOpened', true);
+  } else {
+    vscode.commands.executeCommand('setContext', 'testdriver.chatOpened', false);
+  }
+
+  // Check if test panel has been opened before (for returning users)
+  const testPanelOpenedBefore = context.globalState.get('testdriver.testPanelOpenedBefore', false);
+  if (testPanelOpenedBefore || !isFirstInstall) {
+    // If not first install, assume test panel has been opened before
+    vscode.commands.executeCommand('setContext', 'testdriver.testPanelOpened', true);
+  } else {
+    vscode.commands.executeCommand('setContext', 'testdriver.testPanelOpened', false);
+  }
+
   // Register the sidebar provider
   const sidebarProvider = new TestDriverSidebarProvider(context.extensionUri, context);
   context.subscriptions.push(
@@ -110,16 +137,42 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable);
 
   const apiKeyDisposable = vscode.commands.registerCommand('testdriver.setApiKey', async () => {
+    logger.info('API key command started');
+
+    // Check if API key is already set
+    const existingKey = await context.secrets.get('TD_API_KEY');
+    if (existingKey) {
+      const overwrite = await vscode.window.showQuickPick(
+        ['Yes, replace it', 'No, keep existing'],
+        {
+          placeHolder: 'API key is already set. Do you want to replace it?'
+        }
+      );
+      if (overwrite !== 'Yes, replace it') {
+        logger.info('API key command cancelled - keeping existing key');
+        return true; // Consider this a successful completion since key exists
+      }
+    }
+
     const apiKey = await vscode.window.showInputBox({
       prompt: 'Enter your TestDriver API key (from app.testdriver.ai/team)',
       ignoreFocusOut: true,
       password: true
     });
-    if (apiKey) {
-      await context.secrets.store('TD_API_KEY', apiKey);
+    if (apiKey && apiKey.trim()) {
+      await context.secrets.store('TD_API_KEY', apiKey.trim());
       vscode.window.showInformationMessage('TestDriver API key saved securely.');
+      logger.info('API key saved successfully');
+      track({ event: 'api_key.set' });
+
+      // Set context to indicate API key is now available
+      await vscode.commands.executeCommand('setContext', 'testdriver.hasApiKey', true);
+
+      return true; // Return success for walkthrough completion
     } else {
       vscode.window.showWarningMessage('No API key entered.');
+      logger.info('API key command cancelled');
+      return false; // Return failure
     }
   });
   context.subscriptions.push(apiKeyDisposable);

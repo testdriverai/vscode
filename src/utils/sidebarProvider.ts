@@ -79,7 +79,21 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
           if (workspaceFolder) {
             const fileName = editor.document.uri.fsPath.split('/').pop() || 'test file';
             this._updateFileIndicator(workspaceFolder.name, fileName);
+          } else {
+            // Handle case where workspace folder is not defined
+            const fileName = editor.document.uri.fsPath.split('/').pop() || 'test file';
+            this._updateFileIndicator('Unknown Workspace', fileName);
           }
+        }
+      })
+    );
+
+    // Listen for workspace folder changes to refresh the UI
+    this._context.subscriptions.push(
+      vscode.workspace.onDidChangeWorkspaceFolders(async () => {
+        console.log('Workspace folders changed, refreshing sidebar');
+        if (this._view) {
+          await this._checkAndShowExamples(this._view);
         }
       })
     );
@@ -97,10 +111,14 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
   private _updateFileIndicator(workspaceName: string, fileName: string) {
     if (this._view) {
+      // Provide fallback values for safety
+      const safeworkspaceName = workspaceName || 'Unknown Workspace';
+      const safeFileName = fileName || 'No file selected';
+
       this._view.webview.postMessage({
         command: 'updateFileIndicator',
-        workspaceName: workspaceName,
-        fileName: fileName
+        workspaceName: safeworkspaceName,
+        fileName: safeFileName
       });
     }
   }
@@ -417,7 +435,21 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
     const targetWorkspaceFolder = await this._getTargetWorkspaceFolder();
     if (!targetWorkspaceFolder) {
-      console.log('No workspace folders found');
+      console.log('No workspace folders found, showing default state');
+
+      // Handle case when no workspace is available
+      this._updateFileIndicator('No Workspace', 'Open a folder to get started');
+
+      // Show a message to the user about opening a workspace
+      webviewView.webview.postMessage({
+        command: 'showNoWorkspaceMessage'
+      });
+
+      // Hide both the input area and run button when no workspace
+      webviewView.webview.postMessage({
+        command: 'hideInputAndRunButton'
+      });
+
       return;
     }
 
@@ -442,7 +474,7 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     const isExtensionDev = workspaceFolders?.some(folder =>
       folder.uri.fsPath.includes('testdriver-vscode-extension')
-    );
+    ) ?? false;
 
     if (isExtensionDev && !showExamples) {
       console.log('Extension development mode detected, showing examples for testing');
