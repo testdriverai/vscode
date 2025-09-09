@@ -30,6 +30,14 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
+    // Clean up TestDriver when the sidebar becomes hidden (user closes activity bar)
+    webviewView.onDidChangeVisibility(() => {
+      if (!webviewView.visible) {
+        console.log('TestDriver sidebar became hidden, cleaning up any running tests...');
+        this._handleSilentStopTest(webviewView);
+      }
+    });
+
     // Handle messages from the webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
       console.log('Sidebar received message:', message);
@@ -115,6 +123,17 @@ export class TestDriverSidebarProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       console.error('Error stopping test:', error);
       vscode.window.showErrorMessage('Failed to stop TestDriver test: ' + (error as Error).message);
+    }
+  }
+
+  private async _handleSilentStopTest(webviewView: vscode.WebviewView) {
+    try {
+      console.log('Silently stopping TestDriver test execution (activity bar clicked)...');
+      await stopTestExecution(webviewView);
+      // No UI messages or webview notifications for silent stop
+    } catch (error) {
+      console.error('Error silently stopping test:', error);
+      // Only log the error, don't show user-facing error messages
     }
   }
 
