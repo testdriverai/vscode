@@ -59,7 +59,7 @@ jobs:
         id: get_vsix
         run: |
           VERSION=$(jq -r '.version' package.json)
-          VSIX_PATH="./testdriver-${VERSION}.vsix"
+          VSIX_PATH="./testdriverai-${VERSION}.vsix"
           if [ ! -f "$VSIX_PATH" ]; then
             echo "VSIX file not found at $VSIX_PATH"
             exit 1
