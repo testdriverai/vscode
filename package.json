@@ -1,103 +1,105 @@
 {
-  "name": "testdriver",
-  "publisher": "testdriver",
-  "displayName": "TestDriver",
-  "description": "Automate and scale QA with computer-use agents.",
+  "name": "testdriverai",
+  "displayName": "TestDriver.ai",
+  "description": "AI-powered end-to-end testing with live preview and MCP integration",
+  "version": "0.7.2",
+  "publisher": "testdriverai",
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/testdriverai/testdriverai"
+    "url": "https://github.com/testdriverai/vscode"
   },
-  "version": "0.6.71",
   "engines": {
-    "vscode": "^1.95.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Testing",
-    "AI"
+    "AI",
+    "Other"
   ],
   "keywords": [
-    "ai",
     "testing",
-    "playwright",
-    "selenium"
+    "e2e",
+    "end-to-end",
+    "ai",
+    "automation",
+    "testdriver",
+    "mcp"
   ],
   "activationEvents": [
-    "workspaceContains:testdriver/**",
     "onStartupFinished"
   ],
-  "extensionDependencies": [
-    "kisstkondoros.vscode-gutter-preview",
-    "redhat.vscode-yaml"
-  ],
+  "main": "./out/extension.js",
   "contributes": {
-    "yamlValidation": [
+    "commands": [
       {
-        "fileMatch": "**/testdriver/**/*.{yml,yaml}",
-        "url": "https://raw.githubusercontent.com/testdriverai/testdriverai/main/schema.json"
+        "command": "testdriverai.openDebugger",
+        "title": "TestDriver: Open Live Preview"
+      },
+      {
+        "command": "testdriverai.installMcp",
+        "title": "TestDriver: Install MCP Server"
+      },
+      {
+        "command": "testdriverai.closeDebugger",
+        "title": "TestDriver: Close Live Preview"
       }
     ],
     "walkthroughs": [
       {
         "id": "gettingStarted",
-        "title": "Get Started with TestDriver",
-        "description": "Test your app with a computer-use agent in just a few minutes.",
+        "title": "Get Started with TestDriver.ai",
+        "description": "AI-powered end-to-end testing with live preview in your IDE.",
         "steps": [
           {
-            "id": "signup",
+            "id": "getApiKey",
             "title": "Get a TestDriver API Key",
-            "description": "An account is required to access TestDriver's AI Model as well as sandbox environments for running tests..\n[Get API Key](https://app.testdriver.ai/)",
+            "description": "An API key is required to access TestDriver's AI model and cloud sandboxes.\n[Get API Key](https://console.testdriver.ai/team)",
             "media": {
-              "image": "media/main.png",
-              "altText": "TestDriver main interface"
+              "image": "media/icon.png",
+              "altText": "TestDriver.ai"
             },
             "completionEvents": [
-              "openLink:https://app.testdriver.ai"
+              "openLink:https://console.testdriver.ai/team"
             ]
           },
           {
-            "id": "api",
-            "title": "Set your API Key",
-            "description": "Configure TestDriver with your API Key.\n[Set Your API Key](command:testdriver.setApiKey)",
+            "id": "setEnvVar",
+            "title": "Set your TD_API_KEY",
+            "description": "Add your API key as an environment variable:\n\n```\nexport TD_API_KEY=your-key-here\n```\n\nAdd this to your shell profile (~/.zshrc, ~/.bashrc) so it persists.",
             "media": {
-              "image": "media/main.png",
-              "altText": "TestDriver API key setup"
-            },
-            "completionEvents": [
-              "onContext:testdriver.hasApiKey"
-            ]
+              "image": "media/icon.png",
+              "altText": "Set API Key"
+            }
           },
           {
-            "id": "chat",
-            "title": "Chat with TestDriver AI",
-            "description": "Start a chat with TestDriver to generate tests. Click the TestDriver icon in the activity bar to open the chat panel.\n[Open TestDriver Chat](command:testdriver.openChat)",
+            "id": "installMcp",
+            "title": "Install the MCP Server",
+            "description": "Install the TestDriver MCP server for AI-assisted test creation.\n[Install MCP Server](command:testdriverai.installMcp)",
             "media": {
-              "image": "media/main.png",
-              "altText": "TestDriver chat interface"
+              "image": "media/icon.png",
+              "altText": "MCP Server Installation"
             },
             "completionEvents": [
-              "onContext:testdriver.chatOpened"
+              "onCommand:testdriverai.installMcp"
             ]
           },
           {
             "id": "runTest",
-            "title": "Run your tests!",
-            "description": "Open the VS Code Test Explorer to see and run a test by clicking the play button.\n[Open Test Panel](command:testdriver.runTest)",
+            "title": "Run a test with Live Preview",
+            "description": "Create a test file and set `preview: \"ide\"` to see live execution in your editor:\n\n```javascript\nconst testdriver = TestDriver(context, {\n  preview: 'ide'\n});\n```\n\nThe live preview panel will open automatically when a test starts.",
             "media": {
-              "image": "media/run.png",
-              "altText": "TestDriver run test interface"
-            },
-            "completionEvents": [
-              "onContext:testdriver.testPanelOpened"
-            ]
+              "image": "media/icon.png",
+              "altText": "Live Preview"
+            }
           },
           {
             "id": "readDocs",
             "title": "Read the docs",
-            "description": "There's so much more you can do to harness the power of TestDriver! \n[RTFM](https://docs.testdriver.ai)",
+            "description": "Learn more about TestDriver's features, CI/CD integration, and advanced usage.\n[Open Documentation](https://docs.testdriver.ai)",
             "media": {
-              "image": "media/run.png",
-              "altText": "TestDriver run test interface"
+              "image": "media/icon.png",
+              "altText": "Documentation"
             },
             "completionEvents": [
               "openLink:https://docs.testdriver.ai"
@@ -106,105 +108,43 @@
         ]
       }
     ],
-    "views": {
-      "testdriver-activity": [
-        {
-          "id": "testdriver-sidebar",
-          "name": "Agent",
-          "type": "webview",
-          "icon": "$(comment-discussion)"
+    "configuration": {
+      "title": "TestDriver.ai",
+      "properties": {
+        "testdriverai.autoOpenPreview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open the live preview panel when a test starts"
+        },
+        "testdriverai.mcpServerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to TestDriver MCP server (leave empty for default)"
         }
-      ]
-    },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "testdriver-activity",
-          "title": "TestDriver",
-          "icon": "media/icon-inset.png"
-        }
-      ]
-    },
-    "menus": {
-      "view/title": [
-        {
-          "command": "testdriver.openChat",
-          "when": "view == testExplorer",
-          "group": "navigation"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "testdriver.openChat"
-        }
-      ]
-    },
-    "commands": [
-      {
-        "command": "testdriver.toggleAnalytics",
-        "title": "TestDriver: Toggle Analytics"
-      },
-      {
-        "command": "testdriver.walkthrough",
-        "title": "TestDriver: Start Setup Walkthrough"
-      },
-      {
-        "command": "testdriver.addMcpServer",
-        "title": "TestDriver: Add MCP Server"
-      },
-      {
-        "command": "testdriver.setApiKey",
-        "title": "TestDriver: Set API Key"
-      },
-      {
-        "command": "testdriver.runTest",
-        "title": "TestDriver: Run Test"
-      },
-      {
-        "command": "testdriver.cloneExample",
-        "title": "TestDriver: Clone Example"
-      },
-      {
-        "command": "testdriver.openChat",
-        "title": "TestDriver: Open Chat",
-        "icon": "$(comment-discussion)"
       }
-    ]
+    }
   },
-  "main": "./dist/extension.js",
   "scripts": {
-    "compile": "npm run check-types && node esbuild.js",
-    "check-types": "tsc --noEmit",
-    "watch": "npm-run-all -p watch:*",
-    "watch:esbuild": "node esbuild.js --watch",
-    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "vscode:prepublish": "npm run package",
-    "package": "npm run check-types && node esbuild.js --production"
-  },
-  "dependencies": {
-    "analytics-node": "^6.2.0",
-    "ansi-to-html": "^0.7.2",
-    "dotenv": "^16.4.5",
-    "prismjs": "^1.30.0",
-    "strip-ansi": "^7.1.0",
-    "testdriverai": "^6.1.10",
-    "vscode-languageclient": "^9.0.0",
-    "winston": "^3.17.0"
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
   },
   "devDependencies": {
-    "@eslint/js": "^9.13.0",
-    "@stylistic/eslint-plugin": "^2.9.0",
-    "@types/analytics-node": "^3.1.14",
-    "@types/node": "^20.17.30",
-    "@types/vscode": "^1.95.0",
-    "@vscode/chat-extension-utils": "^0.0.0-alpha.1",
-    "@vscode/prompt-tsx": "^0.3.0-alpha.12",
-    "@vscode/vsce": "^3.6.0",
-    "esbuild": "^0.25.8",
-    "eslint": "^9.13.0",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.2",
-    "typescript-eslint": "^8.26.0",
-    "vscode": "^1.1.37"
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "testdriverai": "^7.3.17",
+    "ws": "^8.16.0"
   }
 }
