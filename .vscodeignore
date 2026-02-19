@@ -9,7 +9,9 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 node_modules/**
-!node_modules/ws/**
 .testdriver/**
 testdriver/**
+.github/**
+esbuild.js
+*.vsix
 .env

@@ -69,9 +69,18 @@ export function activate(context: vscode.ExtensionContext) {
     () => installMcpServer()
   );
 
-  const setApiKeyCommand = vscode.commands.registerCommand(
-    'testdriverai.setApiKey',
-    () => setApiKey(context)
+  const initProjectCommand = vscode.commands.registerCommand(
+    'testdriverai.initProject',
+    () => initProject()
+  );
+
+  const startChatCommand = vscode.commands.registerCommand(
+    'testdriverai.startChat',
+    () => {
+      vscode.commands.executeCommand('workbench.action.chat.open', {
+        query: 'Create a TestDriver test that logs into http://testdriver-sandbox.vercel.app.'
+      });
+    }
   );
 
   const walkthroughCommand = vscode.commands.registerCommand(
@@ -89,7 +98,8 @@ export function activate(context: vscode.ExtensionContext) {
     openDebuggerCommand,
     closeDebuggerCommand,
     installMcpCommand,
-    setApiKeyCommand,
+    initProjectCommand,
+    startChatCommand,
     walkthroughCommand
   );
 
@@ -103,11 +113,6 @@ export function activate(context: vscode.ExtensionContext) {
     );
     context.globalState.update('testdriverai.firstInstall', false);
   }
-
-  // Check if API key is already set
-  context.secrets.get('TD_API_KEY').then(existingApiKey => {
-    vscode.commands.executeCommand('setContext', 'testdriverai.hasApiKey', !!existingApiKey);
-  });
 
   // Start local HTTP server for receiving session notifications
   startHttpServer(context);
@@ -124,37 +129,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Auto-install MCP on first activation
   autoInstallMcp(context);
-}
-
-// ── API Key Management ──────────────────────────────────────────────────────
-
-async function setApiKey(context: vscode.ExtensionContext): Promise<boolean> {
-  const existingKey = await context.secrets.get('TD_API_KEY');
-  if (existingKey) {
-    const overwrite = await vscode.window.showQuickPick(
-      ['Yes, replace it', 'No, keep existing'],
-      { placeHolder: 'API key is already set. Do you want to replace it?' }
-    );
-    if (overwrite !== 'Yes, replace it') {
-      return true;
-    }
-  }
-
-  const apiKey = await vscode.window.showInputBox({
-    prompt: 'Enter your TestDriver API key (from app.testdriver.ai/team)',
-    ignoreFocusOut: true,
-    password: true
-  });
-
-  if (apiKey && apiKey.trim()) {
-    await context.secrets.store('TD_API_KEY', apiKey.trim());
-    vscode.window.showInformationMessage('TestDriver API key saved securely.');
-    await vscode.commands.executeCommand('setContext', 'testdriverai.hasApiKey', true);
-    return true;
-  } else {
-    vscode.window.showWarningMessage('No API key entered.');
-    return false;
-  }
 }
 
 // ── HTTP Server for SDK → Extension IPC ─────────────────────────────────────
@@ -493,6 +467,22 @@ function closeAllDebuggerPanels() {
 }
 
 // ── MCP Server Installation ────────────────────────────────────────────────
+
+async function initProject() {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    vscode.window.showWarningMessage('Please open a folder before initializing TestDriver.');
+    return;
+  }
+
+  const workspaceRoot = workspaceFolders[0].uri;
+  const terminal = vscode.window.createTerminal({
+    name: 'TestDriver Init',
+    cwd: workspaceRoot
+  });
+  terminal.show();
+  terminal.sendText('npx testdriverai init');
+}
 
 async function installMcpServer() {
   const workspaceFolders = vscode.workspace.workspaceFolders;
