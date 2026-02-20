@@ -1,9 +1,9 @@
 {
-  "name": "testdriverai",
+  "name": "testdriver",
   "displayName": "TestDriver.ai",
   "description": "AI-powered end-to-end testing with live preview and MCP integration",
   "version": "0.7.2",
-  "publisher": "testdriverai",
+  "publisher": "testdriver",
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
