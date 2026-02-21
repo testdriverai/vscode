@@ -12,6 +12,10 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "extensionDependencies": [
+    "vitest.explorer",
+    "GitHub.copilot"
+  ],
   "categories": [
     "Testing",
     "AI",
