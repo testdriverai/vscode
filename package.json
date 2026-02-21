@@ -2,7 +2,7 @@
   "name": "testdriver",
   "displayName": "TestDriver.ai",
   "description": "AI-powered end-to-end testing with live preview and MCP integration",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "publisher": "testdriver",
   "icon": "media/icon.png",
   "repository": {
@@ -148,7 +148,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "testdriverai": "^7.3.24",
+    "testdriverai": "^7.3.32",
     "ws": "^8.16.0"
   }
 }
