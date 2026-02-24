@@ -277,10 +277,11 @@ async function setupPreviewWatchers(context: vscode.ExtensionContext) {
       await vscode.workspace.fs.createDirectory(previewsDirUri);
     } catch (error) {
       console.error(`Failed to create previews directory: ${error}`);
-      continue;
     }
 
-    const pattern = new vscode.RelativePattern(folder, '.testdriver/.previews/*.json');
+    // Use ** so the watcher finds .testdriver folders nested at any depth
+    // (e.g. testdriver/.testdriver/.previews/ as well as .testdriver/.previews/)
+    const pattern = new vscode.RelativePattern(folder, '**/.testdriver/.previews/*.json');
     const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
     watcher.onDidCreate((uri) => handlePreviewFile(context, uri));
@@ -289,30 +290,30 @@ async function setupPreviewWatchers(context: vscode.ExtensionContext) {
     previewWatchers.set(folder.uri.fsPath, watcher);
     context.subscriptions.push(watcher);
 
-    processOrCleanupPreviewFiles(context, previewsDirUri);
+    processOrCleanupPreviewFiles(context, folder);
   }
 }
 
 // Process recent preview files (written within the last 30 seconds) and delete stale ones.
 // This handles the race condition where a file is written before the watcher is fully active.
-async function processOrCleanupPreviewFiles(context: vscode.ExtensionContext, previewsDirUri: vscode.Uri) {
+// Scans all .testdriver/.previews directories found anywhere under the workspace folder.
+async function processOrCleanupPreviewFiles(context: vscode.ExtensionContext, folder: vscode.WorkspaceFolder) {
   const RECENT_THRESHOLD_MS = 30000;
   try {
-    const entries = await vscode.workspace.fs.readDirectory(previewsDirUri);
-    for (const [name, type] of entries) {
-      if (type === vscode.FileType.File && name.endsWith('.json')) {
-        const fileUri = vscode.Uri.joinPath(previewsDirUri, name);
-        try {
-          const stat = await vscode.workspace.fs.stat(fileUri);
-          if (Date.now() - stat.mtime < RECENT_THRESHOLD_MS) {
-            await handlePreviewFile(context, fileUri);
-          } else {
-            await vscode.workspace.fs.delete(fileUri);
-          }
-        } catch { /* ignore */ }
-      }
+    const files = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(folder, '**/.testdriver/.previews/*.json')
+    );
+    for (const fileUri of files) {
+      try {
+        const stat = await vscode.workspace.fs.stat(fileUri);
+        if (Date.now() - stat.mtime < RECENT_THRESHOLD_MS) {
+          await handlePreviewFile(context, fileUri);
+        } else {
+          await vscode.workspace.fs.delete(fileUri);
+        }
+      } catch { /* ignore */ }
     }
-  } catch { /* directory might not exist */ }
+  } catch { /* ignore */ }
 }
 
 async function handlePreviewFile(context: vscode.ExtensionContext, uri: vscode.Uri) {
