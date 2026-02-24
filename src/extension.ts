@@ -1,5 +1,4 @@
 import * as crypto from 'crypto';
-import * as fs from 'fs';
 import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
@@ -43,16 +42,12 @@ interface InstanceRegistration {
   timestamp: number;
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log('TestDriver.ai extension is now active');
 
   // Ensure directories exist
-  if (!fs.existsSync(SESSION_DIR)) {
-    fs.mkdirSync(SESSION_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(INSTANCES_DIR)) {
-    fs.mkdirSync(INSTANCES_DIR, { recursive: true });
-  }
+  await vscode.workspace.fs.createDirectory(vscode.Uri.file(SESSION_DIR));
+  await vscode.workspace.fs.createDirectory(vscode.Uri.file(INSTANCES_DIR));
 
   // Register commands
   const openDebuggerCommand = vscode.commands.registerCommand(
@@ -213,7 +208,7 @@ function startHttpServer(context: vscode.ExtensionContext) {
   });
 }
 
-function registerInstance() {
+async function registerInstance() {
   if (!serverPort) { return; }
 
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -231,19 +226,20 @@ function registerInstance() {
 
   const registrationFile = path.join(INSTANCES_DIR, `${instanceId}.json`);
   try {
-    fs.writeFileSync(registrationFile, JSON.stringify(registration, null, 2));
+    await vscode.workspace.fs.writeFile(
+      vscode.Uri.file(registrationFile),
+      Buffer.from(JSON.stringify(registration, null, 2))
+    );
     console.log(`Registered VS Code instance: ${registrationFile}`);
   } catch (error) {
     console.error('Failed to register instance:', error);
   }
 }
 
-function unregisterInstance() {
+async function unregisterInstance() {
   const registrationFile = path.join(INSTANCES_DIR, `${instanceId}.json`);
   try {
-    if (fs.existsSync(registrationFile)) {
-      fs.unlinkSync(registrationFile);
-    }
+    await vscode.workspace.fs.delete(vscode.Uri.file(registrationFile));
   } catch {
     // Ignore cleanup errors
   }
@@ -265,7 +261,7 @@ function handleSessionNotification(context: vscode.ExtensionContext, sessionData
 
 // ── Preview File Watchers ───────────────────────────────────────────────────
 
-function setupPreviewWatchers(context: vscode.ExtensionContext) {
+async function setupPreviewWatchers(context: vscode.ExtensionContext) {
   for (const [, watcher] of previewWatchers) {
     watcher.dispose();
   }
@@ -275,15 +271,13 @@ function setupPreviewWatchers(context: vscode.ExtensionContext) {
   if (!workspaceFolders) { return; }
 
   for (const folder of workspaceFolders) {
-    const previewsDir = path.join(folder.uri.fsPath, '.testdriver', '.previews');
+    const previewsDirUri = vscode.Uri.joinPath(folder.uri, '.testdriver', '.previews');
 
-    if (!fs.existsSync(previewsDir)) {
-      try {
-        fs.mkdirSync(previewsDir, { recursive: true });
-      } catch (error) {
-        console.error(`Failed to create previews directory: ${error}`);
-        continue;
-      }
+    try {
+      await vscode.workspace.fs.createDirectory(previewsDirUri);
+    } catch (error) {
+      console.error(`Failed to create previews directory: ${error}`);
+      continue;
     }
 
     const pattern = new vscode.RelativePattern(folder, '.testdriver/.previews/*.json');
@@ -295,25 +289,25 @@ function setupPreviewWatchers(context: vscode.ExtensionContext) {
     previewWatchers.set(folder.uri.fsPath, watcher);
     context.subscriptions.push(watcher);
 
-    processOrCleanupPreviewFiles(context, previewsDir);
+    processOrCleanupPreviewFiles(context, previewsDirUri);
   }
 }
 
 // Process recent preview files (written within the last 30 seconds) and delete stale ones.
 // This handles the race condition where a file is written before the watcher is fully active.
-function processOrCleanupPreviewFiles(context: vscode.ExtensionContext, previewsDir: string) {
+async function processOrCleanupPreviewFiles(context: vscode.ExtensionContext, previewsDirUri: vscode.Uri) {
   const RECENT_THRESHOLD_MS = 30000;
   try {
-    const files = fs.readdirSync(previewsDir);
-    for (const file of files) {
-      if (file.endsWith('.json')) {
-        const filePath = path.join(previewsDir, file);
+    const entries = await vscode.workspace.fs.readDirectory(previewsDirUri);
+    for (const [name, type] of entries) {
+      if (type === vscode.FileType.File && name.endsWith('.json')) {
+        const fileUri = vscode.Uri.joinPath(previewsDirUri, name);
         try {
-          const stats = fs.statSync(filePath);
-          if (Date.now() - stats.mtimeMs < RECENT_THRESHOLD_MS) {
-            handlePreviewFile(context, vscode.Uri.file(filePath));
+          const stat = await vscode.workspace.fs.stat(fileUri);
+          if (Date.now() - stat.mtime < RECENT_THRESHOLD_MS) {
+            await handlePreviewFile(context, fileUri);
           } else {
-            fs.unlinkSync(filePath);
+            await vscode.workspace.fs.delete(fileUri);
           }
         } catch { /* ignore */ }
       }
@@ -321,9 +315,10 @@ function processOrCleanupPreviewFiles(context: vscode.ExtensionContext, previews
   } catch { /* directory might not exist */ }
 }
 
-function handlePreviewFile(context: vscode.ExtensionContext, uri: vscode.Uri) {
+async function handlePreviewFile(context: vscode.ExtensionContext, uri: vscode.Uri) {
   try {
-    const content = fs.readFileSync(uri.fsPath, 'utf-8');
+    const data = await vscode.workspace.fs.readFile(uri);
+    const content = Buffer.from(data).toString('utf-8');
     if (!content.trim()) { return; }
 
     const sessionData: SessionData = JSON.parse(content);
@@ -335,7 +330,7 @@ function handlePreviewFile(context: vscode.ExtensionContext, uri: vscode.Uri) {
 
     handleSessionNotification(context, sessionData);
 
-    try { fs.unlinkSync(uri.fsPath); } catch { /* ignore */ }
+    try { await vscode.workspace.fs.delete(uri); } catch { /* ignore */ }
   } catch (error) {
     console.error(`Error processing preview file ${uri.fsPath}:`, error);
   }
@@ -524,7 +519,14 @@ async function installMcpServer() {
     path.join(os.homedir(), '.cursor', 'mcp.json')
   ];
 
-  let configPath = mcpConfigPaths.find(p => fs.existsSync(p));
+  let configPath: string | undefined;
+  for (const p of mcpConfigPaths) {
+    try {
+      await vscode.workspace.fs.stat(vscode.Uri.file(p));
+      configPath = p;
+      break;
+    } catch { /* file does not exist, continue */ }
+  }
 
   if (!configPath) {
     const choice = await vscode.window.showQuickPick(
@@ -540,19 +542,20 @@ async function installMcpServer() {
     configPath = choice.value;
   }
 
-  const configDir = path.dirname(configPath);
-  if (!fs.existsSync(configDir)) {
-    fs.mkdirSync(configDir, { recursive: true });
-  }
+  const configDirUri = vscode.Uri.file(path.dirname(configPath));
+  await vscode.workspace.fs.createDirectory(configDirUri);
 
   let config: { mcpServers?: Record<string, unknown> } = {};
-  if (fs.existsSync(configPath)) {
+  try {
+    const raw = await vscode.workspace.fs.readFile(vscode.Uri.file(configPath));
     try {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    } catch (error) {
-      vscode.window.showErrorMessage(`Error reading MCP config: ${error}`);
+      config = JSON.parse(Buffer.from(raw).toString('utf-8'));
+    } catch (parseError) {
+      vscode.window.showErrorMessage(`Error reading MCP config: ${parseError}`);
       return;
     }
+  } catch {
+    // File doesn't exist yet — start with an empty config
   }
 
   if (!config.mcpServers) {
@@ -578,7 +581,10 @@ async function installMcpServer() {
   };
 
   try {
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    await vscode.workspace.fs.writeFile(
+      vscode.Uri.file(configPath),
+      Buffer.from(JSON.stringify(config, null, 2))
+    );
     vscode.window.showInformationMessage(
       `TestDriver MCP installed successfully at ${configPath}. Don't forget to set your TD_API_KEY environment variable.`
     );
@@ -605,12 +611,11 @@ async function autoInstallMcp(context: vscode.ExtensionContext) {
   }
 
   for (const configPath of mcpConfigPaths) {
-    if (fs.existsSync(configPath)) {
-      try {
-        const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        if (cfg.mcpServers?.['testdriver']) { return; }
-      } catch { /* ignore */ }
-    }
+    try {
+      const raw = await vscode.workspace.fs.readFile(vscode.Uri.file(configPath));
+      const cfg = JSON.parse(Buffer.from(raw).toString('utf-8'));
+      if (cfg.mcpServers?.['testdriver']) { return; }
+    } catch { /* file does not exist or is unreadable, continue */ }
   }
 
   const install = await vscode.window.showInformationMessage(
