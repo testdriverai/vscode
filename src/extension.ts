@@ -17,6 +17,7 @@ const previewWatchers: Map<string, vscode.FileSystemWatcher> = new Map();
 // Local HTTP server for receiving session notifications from SDK
 let httpServer: http.Server | undefined;
 let serverPort: number | undefined;
+let registrationHeartbeat: ReturnType<typeof setInterval> | undefined;
 
 // Path to the TestDriver directory (used for IPC between SDK and extension)
 const SESSION_DIR = path.join(os.homedir(), '.testdriver');
@@ -201,6 +202,9 @@ function startHttpServer(context: vscode.ExtensionContext) {
       serverPort = address.port;
       console.log(`TestDriver extension server listening on port ${serverPort}`);
       registerInstance();
+      // Refresh the registration timestamp every 30 seconds so the SDK
+      // never considers this instance stale (SDK threshold is 60 seconds).
+      registrationHeartbeat = setInterval(registerInstance, 30000);
     }
   });
 
@@ -291,17 +295,26 @@ function setupPreviewWatchers(context: vscode.ExtensionContext) {
     previewWatchers.set(folder.uri.fsPath, watcher);
     context.subscriptions.push(watcher);
 
-    cleanupStalePreviewFiles(previewsDir);
+    processOrCleanupPreviewFiles(context, previewsDir);
   }
 }
 
-function cleanupStalePreviewFiles(previewsDir: string) {
+// Process recent preview files (written within the last 30 seconds) and delete stale ones.
+// This handles the race condition where a file is written before the watcher is fully active.
+function processOrCleanupPreviewFiles(context: vscode.ExtensionContext, previewsDir: string) {
+  const RECENT_THRESHOLD_MS = 30000;
   try {
     const files = fs.readdirSync(previewsDir);
     for (const file of files) {
       if (file.endsWith('.json')) {
+        const filePath = path.join(previewsDir, file);
         try {
-          fs.unlinkSync(path.join(previewsDir, file));
+          const stats = fs.statSync(filePath);
+          if (Date.now() - stats.mtimeMs < RECENT_THRESHOLD_MS) {
+            handlePreviewFile(context, vscode.Uri.file(filePath));
+          } else {
+            fs.unlinkSync(filePath);
+          }
         } catch { /* ignore */ }
       }
     }
@@ -425,7 +438,8 @@ function connectToWebSocket(debuggerUrl: string, panel: vscode.WebviewPanel, ses
 
   try {
     const url = new URL(debuggerUrl);
-    const wsUrl = `ws://${url.host}`;
+    const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${url.host}`;
     const ws = new WebSocket(wsUrl);
     websocketConnections.set(sessionId, ws);
 
@@ -705,6 +719,11 @@ function getDebuggerHtml(debuggerUrl: string, encodedData: string): string {
 
 export function deactivate() {
   closeAllDebuggerPanels();
+
+  if (registrationHeartbeat) {
+    clearInterval(registrationHeartbeat);
+    registrationHeartbeat = undefined;
+  }
 
   if (httpServer) {
     httpServer.close();
