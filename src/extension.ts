@@ -367,7 +367,7 @@ function openDebuggerPanel(context: vscode.ExtensionContext, sessionData?: Sessi
   const panel = vscode.window.createWebviewPanel(
     'testdriverDebugger',
     initialTitle,
-    vscode.ViewColumn.Beside,
+    vscode.ViewColumn.One,
     {
       enableScripts: true,
       retainContextWhenHidden: true,
