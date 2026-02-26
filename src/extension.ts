@@ -5,8 +5,14 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import WebSocket from 'ws';
 
-// Store active debugger panels by session ID
-const debuggerPanels: Map<string, vscode.WebviewPanel> = new Map();
+// Single grid panel that shows all active sessions
+let gridPanel: vscode.WebviewPanel | undefined;
+let gridPanelReady = false;
+const gridPendingMessages: object[] = [];
+
+// Active sessions shown in the grid, keyed by session ID
+const activeSessions: Map<string, SessionData> = new Map();
+
 const websocketConnections: Map<string, WebSocket> = new Map();
 let processedSessions: Set<string> = new Set();
 
@@ -348,57 +354,88 @@ function formatPanelTitle(status: string, testFile?: string): string {
   return `[${status}] ${getTestFileName(testFile)}`;
 }
 
-function openDebuggerPanel(context: vscode.ExtensionContext, sessionData?: SessionData) {
-  const sessionId = sessionData?.sessionId || `manual-${Date.now()}`;
-
-  const existingPanel = debuggerPanels.get(sessionId);
-  if (existingPanel) {
-    existingPanel.reveal(vscode.ViewColumn.Active);
-    if (sessionData) {
-      updateDebuggerContent(existingPanel, sessionData, context, sessionId);
-    }
-    return;
-  }
-
-  const initialTitle = sessionData
-    ? formatPanelTitle('Loading', sessionData.testFile)
-    : 'TestDriver Live Preview';
-
-  const panel = vscode.window.createWebviewPanel(
-    'testdriverDebugger',
-    initialTitle,
-    vscode.ViewColumn.Beside,
-    {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-      localResourceRoots: [
-        vscode.Uri.file(path.join(context.extensionPath, 'media'))
-      ]
-    }
-  );
-
-  debuggerPanels.set(sessionId, panel);
-
-  panel.iconPath = {
-    light: vscode.Uri.file(path.join(context.extensionPath, 'media', 'icon.png')),
-    dark: vscode.Uri.file(path.join(context.extensionPath, 'media', 'icon.png'))
-  };
-
-  panel.onDidDispose(() => {
-    debuggerPanels.delete(sessionId);
-    disconnectWebSocket(sessionId);
-    processedSessions.delete(sessionId);
-  }, null, context.subscriptions);
-
-  if (sessionData) {
-    updateDebuggerContent(panel, sessionData, context, sessionId);
+function sendToGrid(message: object) {
+  if (gridPanel && gridPanelReady) {
+    gridPanel.webview.postMessage(message);
   } else {
-    panel.webview.html = getWaitingHtml();
+    gridPendingMessages.push(message);
   }
 }
 
-function updateDebuggerContent(panel: vscode.WebviewPanel, sessionData: SessionData, context: vscode.ExtensionContext, sessionId: string) {
-  connectToWebSocket(sessionData.debuggerUrl, panel, sessionId, sessionData.testFile);
+function updateGridPanelTitle() {
+  if (!gridPanel) { return; }
+  const count = activeSessions.size;
+  gridPanel.title = count > 1
+    ? `TestDriver: Live Preview (${count} tests)`
+    : 'TestDriver: Live Preview';
+}
+
+function openDebuggerPanel(context: vscode.ExtensionContext, sessionData?: SessionData) {
+  const sessionId = sessionData?.sessionId || `manual-${Date.now()}`;
+
+  if (!gridPanel) {
+    gridPanelReady = false;
+    gridPendingMessages.length = 0;
+
+    const panel = vscode.window.createWebviewPanel(
+      'testdriverDebugger',
+      'TestDriver: Live Preview',
+      vscode.ViewColumn.Beside,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode.Uri.file(path.join(context.extensionPath, 'media'))
+        ]
+      }
+    );
+
+    gridPanel = panel;
+
+    panel.iconPath = {
+      light: vscode.Uri.file(path.join(context.extensionPath, 'media', 'icon.png')),
+      dark: vscode.Uri.file(path.join(context.extensionPath, 'media', 'icon.png'))
+    };
+
+    panel.webview.onDidReceiveMessage(
+      (msg) => {
+        if (msg.type === 'ready') {
+          gridPanelReady = true;
+          for (const pending of gridPendingMessages) {
+            panel.webview.postMessage(pending);
+          }
+          gridPendingMessages.length = 0;
+        }
+      },
+      null,
+      context.subscriptions
+    );
+
+    panel.onDidDispose(() => {
+      gridPanel = undefined;
+      gridPanelReady = false;
+      gridPendingMessages.length = 0;
+      for (const sid of activeSessions.keys()) {
+        disconnectWebSocket(sid);
+        processedSessions.delete(sid);
+      }
+      activeSessions.clear();
+    }, null, context.subscriptions);
+
+    panel.webview.html = getGridHtml();
+  } else {
+    gridPanel.reveal(vscode.ViewColumn.Active);
+  }
+
+  if (sessionData) {
+    activeSessions.set(sessionId, sessionData);
+    updateGridPanelTitle();
+    updateDebuggerContent(sessionId, sessionData);
+  }
+}
+
+function updateDebuggerContent(sessionId: string, sessionData: SessionData) {
+  connectToWebSocket(sessionData.debuggerUrl, sessionId, sessionData.testFile);
 
   const data = {
     resolution: sessionData.resolution,
@@ -409,8 +446,15 @@ function updateDebuggerContent(panel: vscode.WebviewPanel, sessionData: SessionD
   };
 
   const encodedData = Buffer.from(JSON.stringify(data)).toString('base64');
-  panel.title = formatPanelTitle('Running', sessionData.testFile);
-  panel.webview.html = getDebuggerHtml(sessionData.debuggerUrl, encodedData);
+  const sessionUrl = new URL(sessionData.debuggerUrl);
+  sessionUrl.searchParams.set('data', encodedData);
+
+  sendToGrid({
+    type: 'addSession',
+    sessionId,
+    url: sessionUrl.toString(),
+    title: formatPanelTitle('Running', sessionData.testFile)
+  });
 }
 
 function extractVncUrl(debuggerUrl: string): string {
@@ -429,7 +473,7 @@ function extractVncUrl(debuggerUrl: string): string {
 
 // ── WebSocket Connection ────────────────────────────────────────────────────
 
-function connectToWebSocket(debuggerUrl: string, panel: vscode.WebviewPanel, sessionId: string, testFile?: string) {
+function connectToWebSocket(debuggerUrl: string, sessionId: string, testFile?: string) {
   disconnectWebSocket(sessionId);
 
   try {
@@ -446,26 +490,34 @@ function connectToWebSocket(debuggerUrl: string, panel: vscode.WebviewPanel, ses
     ws.on('message', (data: Buffer) => {
       try {
         const message = JSON.parse(data.toString());
-        panel.webview.postMessage(message);
+        sendToGrid({ ...message, _gridSessionId: sessionId });
 
         if (message.event) {
+          let status = '';
           switch (message.event) {
             case 'test:start':
-              panel.title = formatPanelTitle('Running', testFile);
+              status = 'Running';
               break;
             case 'test:stop':
-              panel.title = formatPanelTitle('Stopped', testFile);
+              status = 'Stopped';
               break;
             case 'test:success':
-              panel.title = formatPanelTitle('Passed', testFile);
+              status = 'Passed';
               break;
             case 'test:error':
-              panel.title = formatPanelTitle('Failed', testFile);
+              status = 'Failed';
               break;
             case 'error:fatal':
             case 'error:sdk':
-              panel.title = formatPanelTitle('Error', testFile);
+              status = 'Error';
               break;
+          }
+          if (status) {
+            sendToGrid({
+              type: 'updateTitle',
+              sessionId,
+              title: formatPanelTitle(status, testFile)
+            });
           }
         }
       } catch (error) {
@@ -474,7 +526,11 @@ function connectToWebSocket(debuggerUrl: string, panel: vscode.WebviewPanel, ses
     });
 
     ws.on('close', () => {
-      panel.title = formatPanelTitle('Done', testFile);
+      sendToGrid({
+        type: 'updateTitle',
+        sessionId,
+        title: formatPanelTitle('Done', testFile)
+      });
     });
 
     ws.on('error', (error: Error) => {
@@ -494,12 +550,15 @@ function disconnectWebSocket(sessionId: string) {
 }
 
 function closeAllDebuggerPanels() {
-  for (const [sessionId, panel] of debuggerPanels) {
-    panel.dispose();
+  for (const sessionId of activeSessions.keys()) {
     disconnectWebSocket(sessionId);
   }
-  debuggerPanels.clear();
+  activeSessions.clear();
   processedSessions.clear();
+  if (gridPanel) {
+    gridPanel.dispose();
+    gridPanel = undefined;
+  }
 }
 
 // ── MCP Server Installation ────────────────────────────────────────────────
@@ -635,53 +694,7 @@ async function autoInstallMcp(context: vscode.ExtensionContext) {
 
 // ── Webview HTML ────────────────────────────────────────────────────────────
 
-function getWaitingHtml(): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TestDriver Live Preview</title>
-  <style>
-    body {
-      background-color: #1e1e1e;
-      color: #cccccc;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      text-align: center;
-    }
-    h1 { font-size: 24px; font-weight: 500; margin-bottom: 16px; }
-    p { font-size: 14px; color: #888; max-width: 400px; line-height: 1.6; }
-    code { background: #2d2d2d; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
-    .spinner {
-      width: 40px; height: 40px;
-      border: 3px solid #333; border-top-color: #b0cf34;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 24px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-  <div class="spinner"></div>
-  <h1>Waiting for TestDriver...</h1>
-  <p>Run a test with <code>preview: "ide"</code> to see the live execution here.</p>
-  <p style="margin-top: 16px;"><code>const testdriver = TestDriver(context, { preview: "ide" });</code></p>
-</body>
-</html>`;
-}
-
-function getDebuggerHtml(debuggerUrl: string, encodedData: string): string {
-  const url = new URL(debuggerUrl);
-  url.searchParams.set('data', encodedData);
-  const fullUrl = url.toString();
-
+function getGridHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -690,32 +703,130 @@ function getDebuggerHtml(debuggerUrl: string, encodedData: string): string {
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src http://localhost:* https://localhost:*; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
   <title>TestDriver Live Preview</title>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #1e1e1e; }
-    iframe { width: 100%; height: 100%; border: none; }
-    .error { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 20px; }
-    .error.visible { display: flex; }
-    .error h2 { color: #f44336; margin-bottom: 16px; }
-    .error p { color: #888; max-width: 400px; line-height: 1.6; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1e1e1e; }
+    #waiting {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #cccccc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      text-align: center;
+    }
+    #waiting h1 { font-size: 24px; font-weight: 500; margin-bottom: 16px; }
+    #waiting p { font-size: 14px; color: #888; max-width: 400px; line-height: 1.6; }
+    #waiting code { background: #2d2d2d; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #333; border-top-color: #b0cf34;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #grid {
+      display: none;
+      width: 100%;
+      height: 100%;
+      gap: 4px;
+      background: #0d0d0d;
+      padding: 4px;
+      box-sizing: border-box;
+    }
+    .cell {
+      display: flex;
+      flex-direction: column;
+      background: #1e1e1e;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .cell-header {
+      padding: 3px 8px;
+      background: #252526;
+      color: #cccccc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
+      border-bottom: 1px solid #3c3c3c;
+    }
+    .cell iframe {
+      flex: 1;
+      border: none;
+      width: 100%;
+      min-height: 0;
+    }
   </style>
 </head>
 <body>
-  <iframe id="debugger-frame" src="${fullUrl}" sandbox="allow-scripts allow-same-origin"></iframe>
-  <div class="error" id="error-message">
-    <h2>Connection Lost</h2>
-    <p>The TestDriver debugger server is no longer running. Start a new test to reconnect.</p>
+  <div id="waiting">
+    <div class="spinner"></div>
+    <h1>Waiting for TestDriver...</h1>
+    <p>Run a test with <code>preview: "ide"</code> to see the live execution here.</p>
+    <p style="margin-top: 16px;"><code>const testdriver = TestDriver(context, { preview: "ide" });</code></p>
   </div>
+  <div id="grid"></div>
   <script>
-    const iframe = document.getElementById('debugger-frame');
-    const errorDiv = document.getElementById('error-message');
-    iframe.onerror = function() {
-      iframe.style.display = 'none';
-      errorDiv.classList.add('visible');
-    };
-    window.addEventListener('message', event => {
-      if (iframe.contentWindow) {
-        iframe.contentWindow.postMessage(event.data, '*');
+    const vscode = acquireVsCodeApi();
+    const grid = document.getElementById('grid');
+    const waiting = document.getElementById('waiting');
+
+    function updateGridLayout() {
+      const count = grid.children.length;
+      if (count === 0) {
+        grid.style.display = 'none';
+        waiting.style.display = 'flex';
+        return;
+      }
+      waiting.style.display = 'none';
+      grid.style.display = 'grid';
+      const cols = Math.ceil(Math.sqrt(count));
+      const rows = Math.ceil(count / cols);
+      grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+      grid.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)';
+    }
+
+    window.addEventListener('message', function(event) {
+      const msg = event.data;
+      if (msg.type === 'addSession') {
+        let cell = document.getElementById('cell-' + msg.sessionId);
+        if (!cell) {
+          cell = document.createElement('div');
+          cell.id = 'cell-' + msg.sessionId;
+          cell.className = 'cell';
+          const header = document.createElement('div');
+          header.id = 'header-' + msg.sessionId;
+          header.className = 'cell-header';
+          header.textContent = msg.title;
+          const iframe = document.createElement('iframe');
+          iframe.src = msg.url;
+          iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+          cell.appendChild(header);
+          cell.appendChild(iframe);
+          grid.appendChild(cell);
+          updateGridLayout();
+        }
+      } else if (msg.type === 'updateTitle') {
+        const header = document.getElementById('header-' + msg.sessionId);
+        if (header) { header.textContent = msg.title; }
+      } else if (msg.type === 'removeSession') {
+        const cell = document.getElementById('cell-' + msg.sessionId);
+        if (cell) { cell.remove(); updateGridLayout(); }
+      } else if (msg._gridSessionId) {
+        const cell = document.getElementById('cell-' + msg._gridSessionId);
+        if (cell) {
+          const iframe = cell.querySelector('iframe');
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage(msg, '*');
+          }
+        }
       }
     });
+
+    vscode.postMessage({ type: 'ready' });
   </script>
 </body>
 </html>`;
