@@ -100,7 +100,7 @@ export async function activate(context: vscode.ExtensionContext) {
     'testdriverai.chatWithAgent',
     () => {
       vscode.commands.executeCommand('workbench.action.chat.open', {
-        query: 'Search airbnb for a house in austin tx for two people',
+        query: 'Go to http://testdriver-sandbox.vercel.app, login, and add an item to cart',
       });
     }
   );
