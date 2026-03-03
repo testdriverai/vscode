@@ -12,7 +12,7 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "extensionDependencies": [
+  "extensionPack": [
     "vitest.explorer"
   ],
   "categories": [
@@ -46,6 +46,30 @@
       {
         "command": "testdriverai.closeDebugger",
         "title": "TestDriver: Close Live Preview"
+      },
+      {
+        "command": "testdriverai.setApiKey",
+        "title": "TestDriver: Set API Key"
+      },
+      {
+        "command": "testdriverai.login",
+        "title": "TestDriver: Sign In"
+      },
+      {
+        "command": "testdriverai.initProject",
+        "title": "TestDriver: Initialize Project"
+      },
+      {
+        "command": "testdriverai.walkthrough",
+        "title": "TestDriver: Open Getting Started"
+      },
+      {
+        "command": "testdriverai.chatWithAgent",
+        "title": "TestDriver: Chat with Agent"
+      },
+      {
+        "command": "testdriverai.makeRepeatable",
+        "title": "TestDriver: Turn into Repeatable Test"
       }
     ],
     "walkthroughs": [
@@ -55,45 +79,57 @@
         "description": "AI-powered end-to-end testing with live preview in your IDE.",
         "steps": [
           {
-            "id": "getApiKey",
-            "title": "Get a TestDriver API Key",
-            "description": "An API key is required to access TestDriver's AI model and cloud sandboxes.\n[Get API Key](https://console.testdriver.ai/team)",
+            "id": "signIn",
+            "title": "Sign in to TestDriver.ai",
+            "description": "Sign in with your browser to connect your TestDriver account. Your API key will be saved automatically.\n[Sign In](command:testdriverai.login)",
             "media": {
-              "image": "media/icon.png",
+              "image": "media/splash.png",
               "altText": "TestDriver.ai"
             },
             "completionEvents": [
-              "openLink:https://console.testdriver.ai/team"
+              "onContext:testdriverai.hasApiKey"
             ]
           },
           {
-            "id": "setEnvVar",
-            "title": "Set your TD_API_KEY",
-            "description": "Add your API key as an environment variable:\n\n```\nexport TD_API_KEY=your-key-here\n```\n\nAdd this to your shell profile (~/.zshrc, ~/.bashrc) so it persists.",
+            "id": "initProject",
+            "title": "Initialize your project",
+            "description": "Set up example tests, AI agents, skills, vitest config, GitHub Actions workflow, and MCP server config in your workspace.\n[Initialize Project](command:testdriverai.initProject)",
             "media": {
-              "image": "media/icon.png",
-              "altText": "Set API Key"
-            }
+              "image": "media/splash.png",
+              "altText": "Initialize Project"
+            },
+            "completionEvents": [
+              "onContext:testdriverai.projectInitialized"
+            ]
           },
           {
             "id": "installMcp",
             "title": "Install the MCP Server",
-            "description": "Install the TestDriver MCP server for AI-assisted test creation.\n[Install MCP Server](command:testdriverai.installMcp)",
+            "description": "The TestDriver MCP server lets AI coding assistants (Copilot, Cursor, etc.) create and run tests for you.\n\nClick below to configure it, or accept the install prompt when it appears.\n[Install MCP Server](command:testdriverai.installMcp)",
             "media": {
-              "image": "media/icon.png",
+              "image": "media/splash.png",
               "altText": "MCP Server Installation"
             },
             "completionEvents": [
-              "onCommand:testdriverai.installMcp"
+              "onContext:testdriverai.mcpInstalled"
             ]
           },
           {
-            "id": "runTest",
-            "title": "Run a test with Live Preview",
-            "description": "Create a test file and set `preview: \"ide\"` to see live execution in your editor:\n\n```javascript\nconst testdriver = TestDriver(context, {\n  preview: 'ide'\n});\n```\n\nThe live preview panel will open automatically when a test starts.",
+            "id": "chatWithAgent",
+            "title": "Chat with the agent",
+            "description": "Open GitHub Copilot and tell the TestDriver agent what to do.\n[Chat with Agent](command:testdriverai.chatWithAgent)",
             "media": {
-              "image": "media/icon.png",
-              "altText": "Live Preview"
+              "image": "media/splash.png",
+              "altText": "Chat with the agent"
+            }
+          },
+          {
+            "id": "makeRepeatable",
+            "title": "Turn into a repeatable test",
+            "description": "Ask Copilot to convert your session into a repeatable test with a GitHub Action.\n[Make it Repeatable](command:testdriverai.makeRepeatable)",
+            "media": {
+              "image": "media/splash.png",
+              "altText": "Turn into a repeatable test"
             }
           },
           {
@@ -101,7 +137,7 @@
             "title": "Read the docs",
             "description": "Learn more about TestDriver's features, CI/CD integration, and advanced usage.\n[Open Documentation](https://docs.testdriver.ai)",
             "media": {
-              "image": "media/icon.png",
+              "image": "media/splash.png",
               "altText": "Documentation"
             },
             "completionEvents": [

@@ -5,6 +5,8 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import WebSocket from 'ws';
 
+import * as child_process from 'child_process';
+
 // Store active debugger panels by session ID
 const debuggerPanels: Map<string, vscode.WebviewPanel> = new Map();
 const websocketConnections: Map<string, WebSocket> = new Map();
@@ -49,6 +51,9 @@ export async function activate(context: vscode.ExtensionContext) {
   await vscode.workspace.fs.createDirectory(vscode.Uri.file(SESSION_DIR));
   await vscode.workspace.fs.createDirectory(vscode.Uri.file(INSTANCES_DIR));
 
+  // Check MCP installed status on activation (sets walkthrough completion)
+  await checkMcpInstalledStatus();
+
   // Register commands
   const openDebuggerCommand = vscode.commands.registerCommand(
     'testdriverai.openDebugger',
@@ -70,14 +75,43 @@ export async function activate(context: vscode.ExtensionContext) {
     () => setApiKey(context)
   );
 
+  const loginCommand = vscode.commands.registerCommand(
+    'testdriverai.login',
+    () => browserLogin(context)
+  );
+
+  const initProjectCommand = vscode.commands.registerCommand(
+    'testdriverai.initProject',
+    () => runInitProject(context)
+  );
+
   const walkthroughCommand = vscode.commands.registerCommand(
     'testdriverai.walkthrough',
     () => {
       vscode.commands.executeCommand(
         'workbench.action.openWalkthrough',
-        'testdriverai.testdriverai#gettingStarted',
+        'testdriver.testdriver#gettingStarted',
         false
       );
+    }
+  );
+
+  const chatWithAgentCommand = vscode.commands.registerCommand(
+    'testdriverai.chatWithAgent',
+    () => {
+      vscode.commands.executeCommand('workbench.action.chat.open', {
+        query: 'Search airbnb for a house in austin tx for two people',
+      });
+    }
+  );
+
+  const makeRepeatableCommand = vscode.commands.registerCommand(
+    'testdriverai.makeRepeatable',
+    () => {
+      // Send a follow-up message in the current chat session
+      vscode.commands.executeCommand('workbench.action.chat.open', {
+        query: 'Turn this into a repeatable test with a github action',
+      });
     }
   );
 
@@ -86,7 +120,11 @@ export async function activate(context: vscode.ExtensionContext) {
     closeDebuggerCommand,
     installMcpCommand,
     setApiKeyCommand,
-    walkthroughCommand
+    loginCommand,
+    initProjectCommand,
+    walkthroughCommand,
+    chatWithAgentCommand,
+    makeRepeatableCommand
   );
 
   // First-install walkthrough
@@ -94,7 +132,7 @@ export async function activate(context: vscode.ExtensionContext) {
   if (isFirstInstall) {
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',
-      'testdriverai.testdriverai#gettingStarted',
+      'testdriver.testdriver#gettingStarted',
       false
     );
     context.globalState.update('testdriverai.firstInstall', false);
@@ -120,9 +158,130 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Auto-install MCP on first activation
   autoInstallMcp(context);
+
+  // Periodically re-check MCP status so walkthrough step auto-completes
+  // if user installs via the popup or manually
+  const mcpCheckInterval = setInterval(() => checkMcpInstalledStatus(), 5000);
+  context.subscriptions.push({ dispose: () => clearInterval(mcpCheckInterval) });
 }
 
 // ── API Key Management ──────────────────────────────────────────────────────
+
+const API_BASE_URL = 'https://testdriver-api.onrender.com';
+
+async function saveApiKey(context: vscode.ExtensionContext, apiKey: string): Promise<void> {
+  await context.secrets.store('TD_API_KEY', apiKey);
+
+  // Also write to workspace .env so MCP server and vitest can pick it up
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    const envUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.env');
+    let envContent = '';
+    try {
+      const raw = await vscode.workspace.fs.readFile(envUri);
+      envContent = Buffer.from(raw).toString('utf-8');
+      if (envContent.includes('TD_API_KEY=')) {
+        envContent = envContent.replace(/^TD_API_KEY=.*$/m, '');
+      }
+    } catch {
+      // .env doesn't exist yet
+    }
+    const newEnvContent = envContent.trim() + `\nTD_API_KEY=${apiKey}\n`;
+    await vscode.workspace.fs.writeFile(envUri, Buffer.from(newEnvContent));
+  }
+
+  await vscode.commands.executeCommand('setContext', 'testdriverai.hasApiKey', true);
+}
+
+async function browserLogin(context: vscode.ExtensionContext): Promise<boolean> {
+  // Step 1: Request a device code
+  let deviceCode: string;
+  let verificationUri: string;
+  let expiresIn: number;
+  let pollInterval: number;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/device/code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server returned ${res.status}`);
+    }
+
+    const data = await res.json() as {
+      device_code: string;
+      verification_uri: string;
+      expires_in: number;
+      interval: number;
+    };
+    deviceCode = data.device_code;
+    verificationUri = data.verification_uri;
+    expiresIn = data.expires_in || 900;
+    pollInterval = (data.interval || 5) * 1000;
+  } catch (err: any) {
+    vscode.window.showErrorMessage(`Failed to start login: ${err.message}`);
+    return false;
+  }
+
+  // Step 2: Open browser
+  await vscode.env.openExternal(vscode.Uri.parse(verificationUri));
+
+  // Step 3: Poll for the token with a progress indicator
+  const result = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'Waiting for browser authorization…',
+      cancellable: true,
+    },
+    async (_progress, cancellationToken) => {
+      const timeout = expiresIn * 1000;
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < timeout) {
+        if (cancellationToken.isCancellationRequested) {
+          return null;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+        try {
+          const tokenRes = await fetch(`${API_BASE_URL}/auth/device/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceCode }),
+          });
+
+          const data = await tokenRes.json() as { apiKey?: string; error?: string };
+
+          if (tokenRes.ok && data.apiKey) {
+            return data.apiKey;
+          }
+
+          if (data.error === 'expired_token') {
+            vscode.window.showErrorMessage('Authorization timed out. Please try again.');
+            return null;
+          }
+          // authorization_pending — keep polling
+        } catch {
+          // Network hiccup — keep polling
+        }
+      }
+
+      vscode.window.showErrorMessage('Authorization timed out. Please try again.');
+      return null;
+    }
+  );
+
+  if (result) {
+    await saveApiKey(context, result);
+    vscode.window.showInformationMessage('Signed in to TestDriver.ai! API key saved to .env.');
+    return true;
+  }
+
+  return false;
+}
 
 async function setApiKey(context: vscode.ExtensionContext): Promise<boolean> {
   const existingKey = await context.secrets.get('TD_API_KEY');
@@ -136,21 +295,143 @@ async function setApiKey(context: vscode.ExtensionContext): Promise<boolean> {
     }
   }
 
+  const method = await vscode.window.showQuickPick(
+    [
+      { label: '$(globe) Sign in with browser', description: 'Recommended', value: 'browser' },
+      { label: '$(key) Enter API key manually', description: '', value: 'manual' },
+    ],
+    { placeHolder: 'How would you like to authenticate?' }
+  );
+
+  if (!method) {
+    return false;
+  }
+
+  if (method.value === 'browser') {
+    return browserLogin(context);
+  }
+
+  // Manual entry fallback
   const apiKey = await vscode.window.showInputBox({
-    prompt: 'Enter your TestDriver API key (from app.testdriver.ai/team)',
+    prompt: 'Enter your TestDriver API key (from console.testdriver.ai/team)',
     ignoreFocusOut: true,
     password: true
   });
 
   if (apiKey && apiKey.trim()) {
-    await context.secrets.store('TD_API_KEY', apiKey.trim());
-    vscode.window.showInformationMessage('TestDriver API key saved securely.');
-    await vscode.commands.executeCommand('setContext', 'testdriverai.hasApiKey', true);
+    await saveApiKey(context, apiKey.trim());
+    vscode.window.showInformationMessage('TestDriver API key saved to .env.');
     return true;
   } else {
     vscode.window.showWarningMessage('No API key entered.');
     return false;
   }
+}
+
+// ── Project Initialization ──────────────────────────────────────────────────
+
+async function runInitProject(context: vscode.ExtensionContext): Promise<void> {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    vscode.window.showErrorMessage('Open a workspace folder first to initialize a TestDriver project.');
+    return;
+  }
+
+  const targetDir = workspaceFolders[0].uri.fsPath;
+  const apiKey = await context.secrets.get('TD_API_KEY');
+
+  // Read .env to check if API key is already there
+  let envHasKey = false;
+  if (apiKey) {
+    const envUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.env');
+    try {
+      const raw = await vscode.workspace.fs.readFile(envUri);
+      const content = Buffer.from(raw).toString('utf-8');
+      envHasKey = /^TD_API_KEY=.+$/m.test(content);
+    } catch {
+      // .env doesn't exist yet — we'll write the key before running init
+    }
+
+    // Ensure .env has the API key so init picks it up and skips the auth prompt
+    if (!envHasKey) {
+      await saveApiKey(context, apiKey);
+    }
+  }
+
+  const outputChannel = vscode.window.createOutputChannel('TestDriver Init');
+  outputChannel.show();
+  outputChannel.appendLine('Initializing TestDriver project...\n');
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'Initializing TestDriver project…',
+      cancellable: false,
+    },
+    async (progress) => {
+      return new Promise<void>((resolve) => {
+        // Run npx testdriverai init in the workspace folder
+        // The init command will detect TD_API_KEY in .env and skip the auth prompt
+        const env = { ...process.env, TD_API_KEY: apiKey || '', NO_COLOR: '1', FORCE_COLOR: '0' };
+
+        const proc = child_process.spawn('npx', ['testdriverai', 'init'], {
+          cwd: targetDir,
+          env,
+          shell: true,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+
+        // Since TD_API_KEY is in .env, init will skip the prompt entirely
+        proc.stdin?.end();
+
+        let lastMessage = '';
+
+        const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+
+        proc.stdout?.on('data', (data: Buffer) => {
+          const text = data.toString();
+          for (const line of text.split('\n')) {
+            const clean = stripAnsi(line).trim();
+            if (clean) {
+              outputChannel.appendLine(clean);
+              const label = clean.replace(/^[\s✓⊘⚠ℹ📦🚀❌✅]+/, '').trim();
+              if (label && label !== lastMessage) {
+                lastMessage = label;
+                progress.report({ message: label });
+              }
+            }
+          }
+        });
+
+        proc.stderr?.on('data', (data: Buffer) => {
+          const text = stripAnsi(data.toString()).trim();
+          if (text) {
+            outputChannel.appendLine(text);
+          }
+        });
+
+        proc.on('close', (code) => {
+          if (code === 0) {
+            outputChannel.appendLine('\n✅ Project initialized successfully!');
+            vscode.window.showInformationMessage('TestDriver project initialized!');
+            vscode.commands.executeCommand('setContext', 'testdriverai.projectInitialized', true);
+            // Re-check MCP status — init may have created .vscode/mcp.json
+            checkMcpInstalledStatus();
+          } else {
+            outputChannel.appendLine(`\n❌ Init exited with code ${code}`);
+            vscode.window.showWarningMessage('TestDriver init completed with errors. See Output panel for details.');
+          }
+          resolve();
+        });
+
+        proc.on('error', (err) => {
+          outputChannel.appendLine(`\n❌ Error: ${err.message}`);
+          vscode.window.showErrorMessage(`TestDriver init failed: ${err.message}`);
+          resolve();
+        });
+      });
+    }
+  );
 }
 
 // ── HTTP Server for SDK → Extension IPC ─────────────────────────────────────
@@ -367,7 +648,7 @@ function openDebuggerPanel(context: vscode.ExtensionContext, sessionData?: Sessi
   const panel = vscode.window.createWebviewPanel(
     'testdriverDebugger',
     initialTitle,
-    vscode.ViewColumn.Beside,
+    vscode.ViewColumn.Active,
     {
       enableScripts: true,
       retainContextWhenHidden: true,
@@ -504,6 +785,36 @@ function closeAllDebuggerPanels() {
 
 // ── MCP Server Installation ────────────────────────────────────────────────
 
+async function checkMcpInstalledStatus(): Promise<boolean> {
+  const mcpConfigPaths = [
+    path.join(os.homedir(), '.vscode', 'mcp.json'),
+    path.join(os.homedir(), '.cursor', 'mcp.json')
+  ];
+
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (workspaceFolders) {
+    mcpConfigPaths.unshift(
+      path.join(workspaceFolders[0].uri.fsPath, '.vscode', 'mcp.json'),
+      path.join(workspaceFolders[0].uri.fsPath, '.cursor', 'mcp.json')
+    );
+  }
+
+  for (const configPath of mcpConfigPaths) {
+    try {
+      const raw = await vscode.workspace.fs.readFile(vscode.Uri.file(configPath));
+      const cfg = JSON.parse(Buffer.from(raw).toString('utf-8'));
+      // Check both 'servers' (standard VS Code format) and 'mcpServers' (legacy)
+      if (cfg.servers?.['testdriver'] || cfg.mcpServers?.['testdriver']) {
+        await vscode.commands.executeCommand('setContext', 'testdriverai.mcpInstalled', true);
+        return true;
+      }
+    } catch { /* file does not exist or is unreadable, continue */ }
+  }
+
+  await vscode.commands.executeCommand('setContext', 'testdriverai.mcpInstalled', false);
+  return false;
+}
+
 async function installMcpServer() {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -546,7 +857,7 @@ async function installMcpServer() {
   const configDirUri = vscode.Uri.file(path.dirname(configPath));
   await vscode.workspace.fs.createDirectory(configDirUri);
 
-  let config: { mcpServers?: Record<string, unknown> } = {};
+  let config: { servers?: Record<string, unknown>; mcpServers?: Record<string, unknown> } = {};
   try {
     const raw = await vscode.workspace.fs.readFile(vscode.Uri.file(configPath));
     try {
@@ -559,11 +870,12 @@ async function installMcpServer() {
     // File doesn't exist yet — start with an empty config
   }
 
-  if (!config.mcpServers) {
-    config.mcpServers = {};
+  if (!config.servers) {
+    config.servers = {};
   }
 
-  if (config.mcpServers['testdriver']) {
+  // Check both 'servers' (standard) and 'mcpServers' (legacy) for existing config
+  if (config.servers['testdriver'] || config.mcpServers?.['testdriver']) {
     const overwrite = await vscode.window.showWarningMessage(
       'TestDriver MCP is already configured. Overwrite?',
       'Yes',
@@ -572,11 +884,10 @@ async function installMcpServer() {
     if (overwrite !== 'Yes') { return; }
   }
 
-  config.mcpServers['testdriver'] = {
+  config.servers['testdriver'] = {
     command: 'npx',
-    args: ['-y', 'testdriverai', 'mcp'],
+    args: ['-p', 'testdriverai', 'testdriverai-mcp'],
     env: {
-      TD_API_KEY: '${env:TD_API_KEY}',
       TD_PREVIEW: 'ide'
     }
   };
@@ -587,8 +898,10 @@ async function installMcpServer() {
       Buffer.from(JSON.stringify(config, null, 2))
     );
     vscode.window.showInformationMessage(
-      `TestDriver MCP installed successfully at ${configPath}. Don't forget to set your TD_API_KEY environment variable.`
+      `TestDriver MCP installed successfully at ${configPath}. The MCP server reads TD_API_KEY from your workspace .env file.`
     );
+    // Update context so walkthrough step auto-completes
+    await checkMcpInstalledStatus();
   } catch (error) {
     vscode.window.showErrorMessage(`Error writing MCP config: ${error}`);
   }
@@ -615,7 +928,8 @@ async function autoInstallMcp(context: vscode.ExtensionContext) {
     try {
       const raw = await vscode.workspace.fs.readFile(vscode.Uri.file(configPath));
       const cfg = JSON.parse(Buffer.from(raw).toString('utf-8'));
-      if (cfg.mcpServers?.['testdriver']) { return; }
+      // Check both 'servers' (standard VS Code format) and 'mcpServers' (legacy)
+      if (cfg.servers?.['testdriver'] || cfg.mcpServers?.['testdriver']) { return; }
     } catch { /* file does not exist or is unreadable, continue */ }
   }
 
@@ -628,6 +942,20 @@ async function autoInstallMcp(context: vscode.ExtensionContext) {
 
   if (install === 'Install') {
     await installMcpServer();
+  } else if (install === 'Not Now') {
+    // Don't dismiss permanently — remind them via the walkthrough
+    vscode.window.showInformationMessage(
+      'You can install the MCP server later from the Getting Started walkthrough.',
+      'Open Walkthrough'
+    ).then(choice => {
+      if (choice === 'Open Walkthrough') {
+        vscode.commands.executeCommand(
+          'workbench.action.openWalkthrough',
+          'testdriver.testdriver#gettingStarted',
+          false
+        );
+      }
+    });
   } else if (install === 'Never') {
     await config.update('mcpPromptDismissed', true, vscode.ConfigurationTarget.Global);
   }
